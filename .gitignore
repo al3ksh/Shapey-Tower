@@ -1,0 +1,33 @@
+# Build trees
+/build/
+/build-debug/
+/cmake-build-*/
+
+# CMake
+/CMakeFiles/
+/CMakeCache.txt
+/compile_commands.json
+/Makefile
+/*.sln
+/*.vcxproj*
+/install_manifest.txt
+
+# Binaries & libs
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.obj
+*.o
+*.a
+
+# IDE
+/.vs/
+
+# Logs / misc
+*.log
+*.tmp
+*.cache
+Thumbs.db
+.DS_Store

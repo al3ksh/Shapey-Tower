@@ -1,0 +1,4 @@
+#ifdef _WIN32
+#define IDI_APPICON 101
+IDI_APPICON ICON "shapeyicon.ico"
+#endif
