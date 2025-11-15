@@ -99,6 +99,50 @@
                 "cwd": "${workspaceFolder}\\build-debug"
             },
             "problemMatcher": []
+        },
+        {
+            "label": "cmake: install (Release)",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--install",
+                "build",
+                "--config",
+                "Release",
+                "--prefix",
+                "${workspaceFolder}\\dist"
+            ],
+            "options": { "cwd": "${workspaceFolder}" },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "cpack: package (Release)",
+            "type": "shell",
+            "command": "cpack",
+            "args": ["-C", "Release"],
+            "options": { "cwd": "${workspaceFolder}\\build" },
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Release: build+package",
+            "dependsOn": [
+                "cmake: configure (Release)",
+                "cmake: build (Release)",
+                "cmake: install (Release)",
+                "cpack: package (Release)"
+            ],
+            "dependsOrder": "sequence",
+            "type": "shell",
+            "command": "echo Release package ready"
+        },
+        {
+            "label": "Run shapeytower (dist)",
+            "type": "shell",
+            "command": "${workspaceFolder}\\dist\\shapeytower.exe",
+            "options": { "cwd": "${workspaceFolder}\\dist" },
+            "problemMatcher": []
         }
     ]
 }

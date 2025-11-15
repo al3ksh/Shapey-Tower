@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(ShapeyTower LANGUAGES CXX)
+project(ShapeyTower VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -68,3 +68,21 @@ add_custom_command(TARGET shapeytower POST_BUILD
             ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:shapeytower>/assets
     COMMENT "Copy assets/ next to the executable"
 )
+
+# ----- Install rules for packaging / staging -----
+install(TARGETS shapeytower RUNTIME DESTINATION .)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets DESTINATION .)
+if(EXISTS "${CMAKE_SOURCE_DIR}/settings.cfg")
+    install(FILES ${CMAKE_SOURCE_DIR}/settings.cfg DESTINATION .)
+endif()
+if(EXISTS "${CMAKE_SOURCE_DIR}/highscore.txt")
+    install(FILES ${CMAKE_SOURCE_DIR}/highscore.txt DESTINATION .)
+endif()
+
+# ----- CPack (ZIP) configuration for one-click packaging -----
+set(CPACK_PACKAGE_NAME "ShapeyTower")
+set(CPACK_PACKAGE_VENDOR "al3ksh")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
+set(CPACK_GENERATOR "ZIP")
+include(CPack)
