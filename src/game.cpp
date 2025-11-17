@@ -15,6 +15,9 @@ extern "C" void SetDockIcon(const char* path);
 Game::Game(const GameConfig &cfg):cfg(cfg){
     DEBUG_LOG("Game ctor start (%dx%d)", cfg.screenWidth, cfg.screenHeight);
     InitWindow(cfg.screenWidth,cfg.screenHeight,"Shapey Tower");
+    Vector2 initialPos = GetWindowPosition();
+    windowedPosX = (int)initialPos.x;
+    windowedPosY = (int)initialPos.y;
     // App icon: try common paths (window/dock where supported)
     const char* iconPaths[] = {"assets/icons/shapeyicon.png","icons/shapeyicon.png","shapeyicon.png"};
     for(const char* ip: iconPaths){
@@ -156,24 +159,40 @@ void Game::ApplyResolution(bool recenterCamera){
     if(resolutionIndex < 0) resolutionIndex = 0; else if(resolutionIndex >= resCount) resolutionIndex = resCount-1;
     int newW = kResolutions[resolutionIndex].w;
     int newH = kResolutions[resolutionIndex].h;
-    bool isFs = IsWindowFullscreen();
-    if(fullscreen != isFs){
-        if(fullscreen){
-            windowedW = GetScreenWidth();
-            windowedH = GetScreenHeight();
-            ToggleFullscreen();
-        } else {
-            ToggleFullscreen();
-            SetWindowSize(windowedW, windowedH);
-        }
-        isFs = !isFs;
-    }
     cfg.screenWidth = newW;
     cfg.screenHeight = newH;
-    if(!isFs){
-        SetWindowSize(newW,newH);
-        windowedW = newW; windowedH = newH;
+    if(fullscreen){
+        if(!fakeFullscreenActive){
+            Vector2 pos = GetWindowPosition();
+            windowedPosX = (int)pos.x;
+            windowedPosY = (int)pos.y;
+        }
+        int monitor = GetCurrentMonitor();
+        Vector2 monitorPos = GetMonitorPosition(monitor);
+        int monitorW = GetMonitorWidth(monitor);
+        int monitorH = GetMonitorHeight(monitor);
+        SetWindowState(FLAG_WINDOW_UNDECORATED);
+#ifdef FLAG_WINDOW_TOPMOST
+        SetWindowState(FLAG_WINDOW_TOPMOST);
+#endif
+        SetWindowPosition((int)monitorPos.x, (int)monitorPos.y);
+        SetWindowSize(monitorW, monitorH);
+        fakeFullscreenActive = true;
+    } else {
+        if(fakeFullscreenActive){
+            ClearWindowState(FLAG_WINDOW_UNDECORATED);
+#ifdef FLAG_WINDOW_TOPMOST
+            ClearWindowState(FLAG_WINDOW_TOPMOST);
+#endif
+            SetWindowPosition(windowedPosX, windowedPosY);
+            SetWindowSize(newW,newH);
+            fakeFullscreenActive = false;
+        } else {
+            SetWindowSize(newW,newH);
+        }
     }
+    windowedW = newW;
+    windowedH = newH;
     state.camera.offset = {(float)newW/2.f,(float)newH/2.f};
     if(recenterCamera){ state.camera.target.x = (float)newW/2.f; }
     for(auto &pf: state.platforms){ if(pf.rect.x + pf.rect.width > cfg.screenWidth){ pf.rect.x = cfg.screenWidth - pf.rect.width; if(pf.rect.x < 0) pf.rect.x = 0; } }

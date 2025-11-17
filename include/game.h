@@ -99,8 +99,11 @@ private:
     Rectangle viewportRect{0,0,0,0};
     int windowedW = 480;
     int windowedH = 800;
+    int windowedPosX = 0;
+    int windowedPosY = 0;
     int resolutionIndex = 0;
     bool fullscreen = false;
+    bool fakeFullscreenActive = false;
     void ApplyResolution(bool recenterCamera=true);
     bool settingsDirty = false;
     float settingsSaveTimer = 0.f;
