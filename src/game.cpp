@@ -327,13 +327,17 @@ void Game::UpdateGameplay(float dt){
     state.animTime += dt;
     UpdateShake(state.screenShake, dt);
     
+    // Update visual effect timers
+    if(state.shieldFlashAlpha > 0) state.shieldFlashAlpha -= dt * 4.f; // Fast fade out
+    if(state.doubleJumpEffectTimer > 0) state.doubleJumpEffectTimer -= dt;
+    
     for (auto it = state.activePowerUps.begin(); it != state.activePowerUps.end();) {
         it->timeRemaining -= dt;
         if (it->timeRemaining <= 0) {
             if (it->type == PowerUpType::SLOW_MOTION) state.slowMotionFactor = 1.f;
             else if (it->type == PowerUpType::COIN_MAGNET) state.coinMagnetRange = 0.f;
-            else if (it->type == PowerUpType::DOUBLE_JUMP) state.hasDoubleJump = false;
-            else if (it->type == PowerUpType::SHIELD) state.hasShield = false;
+            else if (it->type == PowerUpType::DOUBLE_JUMP) { state.hasDoubleJump = false; state.activeDoubleJump = false; }
+            // Shield is handled by powerUpTimers to ensure death check sees it
             it = state.activePowerUps.erase(it);
         } else ++it;
     }
@@ -422,6 +426,7 @@ void Game::UpdateGameplay(float dt){
         state.player.vel.y = cfg.BASE_JUMP_SPEED * 0.85f;
         state.doubleJumpUsed = true;
         state.jumpBufferTimer = 0.f;
+        state.doubleJumpEffectTimer = 0.3f; // Trigger visual effect
         if(state.audio.sndJump.frameCount>0){ SetSoundVolume(state.audio.sndJump, state.audio.volJump * VOL_JUMP_MULT * VOLUME_SCALE * 0.8f); PlaySound(state.audio.sndJump);}
     }
     
@@ -469,14 +474,14 @@ void Game::UpdateGameplay(float dt){
                 case PowerUpType::DOUBLE_JUMP: 
                     state.hasDoubleJump = true; 
                     state.activeDoubleJump = true;
-                    state.powerUpTimers[0] = 15.f;
-                    duration = 15.f; 
+                    state.powerUpTimers[0] = 10.f;
+                    duration = 10.f; 
                     break;
                 case PowerUpType::SHIELD: 
                     state.hasShield = true; 
                     state.activeShield = true;
-                    state.powerUpTimers[1] = 12.f;
-                    duration = 12.f; 
+                    state.powerUpTimers[1] = 8.f;
+                    duration = 8.f; 
                     break;
                 case PowerUpType::SLOW_MOTION: 
                     state.slowMotionFactor = 0.6f; 
@@ -491,6 +496,8 @@ void Game::UpdateGameplay(float dt){
                     duration = 10.f; 
                     break;
             }
+            state.activePowerUps.erase(std::remove_if(state.activePowerUps.begin(), state.activePowerUps.end(),
+                [&pu](const ActivePowerUp& p){ return p.type == pu.type; }), state.activePowerUps.end());
             state.activePowerUps.push_back({pu.type, duration});
             if(settings.screenShake) TriggerShake(state.screenShake, 3.f, 0.1f);
         }
@@ -557,7 +564,10 @@ void Game::UpdateGameplay(float dt){
     if(state.player.pos.y > loseThreshold){ 
         if(state.hasShield) {
             state.hasShield = false;
-            state.player.vel.y = cfg.BASE_JUMP_SPEED;
+            state.activeShield = false;
+            state.powerUpTimers[1] = 0.f;
+            state.shieldFlashAlpha = 1.0f; // Trigger white flash
+            state.player.vel.y = cfg.BASE_JUMP_SPEED * 1.4f; // Stronger bounce when shield saves you
             state.activePowerUps.erase(std::remove_if(state.activePowerUps.begin(), state.activePowerUps.end(), 
                 [](const ActivePowerUp& p){ return p.type == PowerUpType::SHIELD; }), state.activePowerUps.end());
             if(settings.screenShake) TriggerShake(state.screenShake, 8.f, 0.3f);

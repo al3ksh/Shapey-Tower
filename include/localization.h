@@ -62,6 +62,7 @@ const char* Effects_Title();
 const char* Effects_ScreenShake();
 const char* Effects_Particles();
 const char* Effects_ComboFire();
+const char* Effects_PowerUp();
 const char* Effects_ResetAll();
 
 // Pause Menu

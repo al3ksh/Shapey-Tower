@@ -20,6 +20,7 @@ struct GameSettings {
     bool screenShake = true;
     bool particles = true;
     bool comboEffects = true;
+    bool powerUpEffects = true;
     int language = 0; // 0 = EN, 1 = PL
 };
 

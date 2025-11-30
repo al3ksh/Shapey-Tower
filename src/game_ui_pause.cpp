@@ -268,6 +268,10 @@ void Game::DrawPause(){
         bool comboChanged = false;
         DrawPauseToggle(y, uiCenterX, Loc::Effects_ComboFire(), settings.comboEffects, mPos, click, comboChanged, sw);
         if(comboChanged) settingsDirty = true;
+        
+        bool powerUpChanged = false;
+        DrawPauseToggle(y, uiCenterX, Loc::Effects_PowerUp(), settings.powerUpEffects, mPos, click, powerUpChanged, sw);
+        if(powerUpChanged) settingsDirty = true;
     }
     
     state.audio.masterVolume = 0.0001f + state.audio.masterSlider * 1.0f;

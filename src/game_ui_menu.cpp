@@ -405,6 +405,10 @@ void Game::DrawMenu(){
         DrawToggle(y, uiCenterX, Loc::Effects_ComboFire(), settings.comboEffects, mPos, click, comboChanged, sw);
         if(comboChanged) settingsDirty = true;
         
+        bool powerUpChanged = false;
+        DrawToggle(y, uiCenterX, Loc::Effects_PowerUp(), settings.powerUpEffects, mPos, click, powerUpChanged, sw);
+        if(powerUpChanged) settingsDirty = true;
+        
         y += 25;
         bool pressed = false;
         GuiButtonCentered(uiCenterX, y, 180, 32, Loc::Effects_ResetAll(), mPos, pressed);

@@ -85,6 +85,10 @@ struct GameState {
     bool activeMagnet = false;
     float powerUpTimers[4] = {0.f, 0.f, 0.f, 0.f};
     
+    // Visual effects
+    float shieldFlashAlpha = 0.f;      // White flash when shield is consumed
+    float doubleJumpEffectTimer = 0.f; // Ring effect when double jump is used
+    
     Difficulty difficulty = Difficulty::NORMAL;
     DailyChallenge dailyChallenge;
     bool isDailyRun = false;

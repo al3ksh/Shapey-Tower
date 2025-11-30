@@ -34,6 +34,7 @@ bool LoadSettings(const std::string &path, GameSettings &out){
             else if(k=="screenShake") { out.screenShake=(v=="1"||v=="true"); }
             else if(k=="particles") { out.particles=(v=="1"||v=="true"); }
             else if(k=="comboEffects") { out.comboEffects=(v=="1"||v=="true"); }
+            else if(k=="powerUpEffects") { out.powerUpEffects=(v=="1"||v=="true"); }
             else if(k=="language") { out.language=std::stoi(v); }
     } catch(...){ /* ignore parse errors */}
     }
@@ -70,6 +71,7 @@ bool SaveSettings(const std::string &path, const GameSettings &in){
     ofs << "screenShake="<< (in.screenShake?1:0) <<"\n";
     ofs << "particles="<< (in.particles?1:0) <<"\n";
     ofs << "comboEffects="<< (in.comboEffects?1:0) <<"\n";
+    ofs << "powerUpEffects="<< (in.powerUpEffects?1:0) <<"\n";
     ofs << "language="<< in.language <<"\n";
     return true;
 }

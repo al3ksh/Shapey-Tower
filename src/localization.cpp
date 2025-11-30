@@ -62,6 +62,7 @@ const char* Loc::Effects_Title() { return LOC("Effects", "Efekty"); }
 const char* Loc::Effects_ScreenShake() { return LOC("Screen Shake", "Trzesienie ekranu"); }
 const char* Loc::Effects_Particles() { return LOC("Particles", "Czasteczki"); }
 const char* Loc::Effects_ComboFire() { return LOC("Combo Fire Effect", "Efekt combo (ogien)"); }
+const char* Loc::Effects_PowerUp() { return LOC("Power-up Effects", "Efekty power-upow"); }
 const char* Loc::Effects_ResetAll() { return LOC("Reset All", "Reset wszystkiego"); }
 
 // Pause Menu

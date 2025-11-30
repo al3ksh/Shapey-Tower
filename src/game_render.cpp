@@ -71,6 +71,18 @@ void Game::DrawGameWorld(float dt){
         DrawRectangle((int)state.player.pos.x,(int)state.player.pos.y,(int)state.player.width,(int)state.player.height,state.currentTheme.playerBody);
         DrawRectangleLines((int)state.player.pos.x,(int)state.player.pos.y,(int)state.player.width,(int)state.player.height,{40,40,40,255});
     }
+    
+    // Double jump effect - expanding ring
+    if(settings.powerUpEffects && state.doubleJumpEffectTimer > 0) {
+        float t = 1.f - (state.doubleJumpEffectTimer / 0.3f); // 0 to 1
+        float radius = 15.f + t * 40.f; // Expanding radius
+        unsigned char alpha = (unsigned char)(200 * (1.f - t)); // Fade out
+        float cx = state.player.pos.x + state.player.width/2;
+        float cy = state.player.pos.y + state.player.height/2;
+        DrawCircleLines((int)cx, (int)cy, radius, Color{150, 220, 255, alpha});
+        DrawCircleLines((int)cx, (int)cy, radius * 0.7f, Color{200, 240, 255, (unsigned char)(alpha * 0.5f)});
+    }
+    
     EndMode2D();
 }
 
@@ -131,6 +143,11 @@ void Game::DrawGame(){
     DrawGameWorld(dt);
     DrawHud(dt);
     DrawGameOverOverlay();
+    // Shield consumed flash - white overlay
+    if(settings.powerUpEffects && state.shieldFlashAlpha > 0) {
+        unsigned char a = (unsigned char)(state.shieldFlashAlpha * 200);
+        DrawRectangle(0, 0, cfg.gameWidth, cfg.gameHeight, Color{255, 255, 255, a});
+    }
     if(state.fadeAlpha>0.01f) DrawRectangle(0,0,cfg.gameWidth,cfg.gameHeight,{0,0,0,(unsigned char)(state.fadeAlpha*255)});
     EndTextureMode();
     int winW=GetScreenWidth(), winH=GetScreenHeight(); float scale=std::fmin((float)winW/cfg.gameWidth,(float)winH/cfg.gameHeight); int drawW=(int)(cfg.gameWidth*scale); int drawH=(int)(cfg.gameHeight*scale); int offX=(winW-drawW)/2; int offY=(winH-drawH)/2; viewportRect={(float)offX,(float)offY,(float)drawW,(float)drawH};
