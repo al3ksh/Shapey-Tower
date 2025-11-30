@@ -45,7 +45,7 @@ struct GameState {
     float highestPlatformY=0.f; float cameraTopY=0.f;
     Camera2D camera{};
     bool paused=true; bool started=false;
-    bool onGround=false; float coyoteTimer=0.f; float jumpBufferTimer=0.f;
+    bool onGround=false; bool onIce=false; float coyoteTimer=0.f; float jumpBufferTimer=0.f;
     GameAudio audio;
     Texture2D playerTexture{};
     float playerSpriteScale = 1.8f;
@@ -106,6 +106,7 @@ struct GameConfig {
     float MOVE_ACCEL=3600.f;
     float MAX_HSPEED=580.f;
     float FRICTION=1800.f;
+    float ICE_FRICTION=200.f;
     float BASE_JUMP_SPEED=-900.f;
     float EXTRA_JUMP_BOOST=300.f;
     float COYOTE_TIME=0.10f;

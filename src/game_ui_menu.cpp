@@ -107,6 +107,50 @@ static void DrawSelector(int &y, float uiCenterX, const char** options, int optC
     y += boxH + 10;
 }
 
+static void DrawDifficultySelector(int &y, float uiCenterX, const char** options, int &selected, Vector2 mPos, bool click, bool &changed, int sw) {
+    int boxW = 280, boxH = 30;
+    int boxX = (int)(uiCenterX - boxW/2);
+    if(boxX < 10) boxX = 10;
+    if(boxX + boxW > sw - 10) boxX = sw - 10 - boxW;
+    
+    Color selColors[3] = {
+        Color{60,160,80,255},   
+        Color{200,160,50,255},  
+        Color{180,60,60,255}    
+    };
+    Color borderColors[3] = {
+        Color{100,220,100,255}, 
+        Color{255,200,80,255},  
+        Color{255,100,100,255}  
+    };
+    
+    int btnW = (boxW - 2*3) / 3;
+    for(int i = 0; i < 3; i++) {
+        Rectangle rect{(float)(boxX + i*(btnW+3)), (float)y, (float)btnW, (float)boxH};
+        bool sel = (selected == i);
+        bool hov = CheckCollisionPointRec(mPos, rect);
+        
+        Color bgCol, borderCol;
+        if(sel) {
+            bgCol = selColors[i];
+            borderCol = borderColors[i];
+        } else if(hov) {
+            bgCol = Color{(unsigned char)(selColors[i].r/2), (unsigned char)(selColors[i].g/2), (unsigned char)(selColors[i].b/2), 255};
+            borderCol = Color{80,80,80,255};
+        } else {
+            bgCol = Color{45,55,70,255};
+            borderCol = Color{80,80,80,255};
+        }
+        
+        DrawRectangleRec(rect, bgCol);
+        DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, borderCol);
+        int tw = MeasureText(options[i], 13);
+        DrawText(options[i], (int)(rect.x + rect.width/2 - tw/2), (int)(rect.y + 8), 13, RAYWHITE);
+        if(click && hov && selected != i) { selected = i; changed = true; }
+    }
+    y += boxH + 10;
+}
+
 void Game::DrawMenu(){
     BeginDrawing();
     ClearBackground(Color{12,16,24,255});
@@ -145,7 +189,7 @@ void Game::DrawMenu(){
         const char* diffNames[] = {"EASY", "NORMAL", "HARD"};
         int diffInt = (int)state.difficulty;
         bool diffChanged = false;
-        DrawSelector(y, uiCenterX, diffNames, 3, diffInt, mPos, click, diffChanged, sw);
+        DrawDifficultySelector(y, uiCenterX, diffNames, diffInt, mPos, click, diffChanged, sw);
         if(diffChanged) {
             state.difficulty = (Difficulty)diffInt;
             settingsDirty = true;

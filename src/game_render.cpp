@@ -79,9 +79,17 @@ void Game::DrawHud(float dt){
     if(state.currentScreen==GameState::Screen::GAMEOVER) return; 
     DrawText(TextFormat("Score: %d  Best: %d",state.score,state.highScore),10,Const::HUD_TOP_MARGIN,Const::HUD_SCORE_FONT,RAYWHITE);
     constexpr int MIN_COMBO=Const::COMBO_MIN_MULT; unsigned char a=(state.comboTimer>0)?255:70; Color col=(state.comboCount>=MIN_COMBO && state.comboTimer>0)?Color{255,200,100,a}:Color{160,160,160,a}; DrawText(TextFormat("Combo x%d",state.comboCount),10,40,Const::HUD_COMBO_FONT,col);
-    DrawCircle(cfg.gameWidth - 80, 45, 8, GOLD);
-    DrawText(TextFormat("%d", state.totalCoins), cfg.gameWidth - 65, 38, 20, GOLD);
-    int powerUpY = 90;
+    
+    float radius=Const::HUD_CLOCK_RADIUS; float clockX=cfg.gameWidth - radius - 20.f; float clockY=radius + 20.f; DrawCircleLines((int)clockX,(int)clockY,radius,RAYWHITE); int segmentsDone=state.speedStage; for(int s=0;s<segmentsDone && s<5;++s){ float a0=-PI/2+(2*PI/5)*s; float a1=-PI/2+(2*PI/5)*(s+1); Vector2 p0{clockX+std::cos(a0)*radius*0.9f,clockY+std::sin(a0)*radius*0.9f}; Vector2 p1{clockX+std::cos(a1)*radius*0.9f,clockY+std::sin(a1)*radius*0.9f}; DrawLineEx({clockX,clockY},p0,2.f,{180,180,255,200}); DrawLineEx({clockX,clockY},p1,2.f,{180,180,255,200}); }
+    float phase=(state.speedStage<5)?(state.stageTimer/cfg.STAGE_DURATION):0.f; float angle=(state.speedStage<5)?(-PI/2+phase*2*PI):(-PI/2-GetTime()*5.f); Vector2 hand{clockX+std::cos(angle)*radius*0.85f,clockY+std::sin(angle)*radius*0.85f}; DrawLineEx({clockX,clockY},hand,3.f,(state.speedStage<5)?Color{255,220,120,255}:Color{255,80,80,255}); DrawCircle((int)clockX,(int)clockY,3,(state.speedStage<5)?RAYWHITE:Color{255,80,80,255});
+    
+    int coinY = (int)(clockY + radius + 15);
+    DrawCircle(cfg.gameWidth - 45, coinY, 8, GOLD);
+    DrawText(TextFormat("%d", state.totalCoins), cfg.gameWidth - 30, coinY - 10, 20, GOLD);
+    
+    if(settings.showFPS){ DrawText(TextFormat("FPS: %d", GetFPS()), cfg.gameWidth - 70, coinY + 20, 16, {255,255,255,180}); }
+    
+    int powerUpY = 70;
     if(state.activeDoubleJump && state.powerUpTimers[0] > 0) {
         float pct = state.powerUpTimers[0] / 10.0f;
         DrawRectangle(10, powerUpY, (int)(100 * pct), 12, Color{100, 200, 255, 200});
@@ -106,10 +114,6 @@ void Game::DrawHud(float dt){
         DrawText("Magnet", 15, powerUpY - 2, 14, WHITE);
     }
     if(state.themeChangeTimer>0){ state.themeChangeTimer-=dt; float alpha=state.themeChangeTimer/3.f; if(alpha<0) alpha=0; if(alpha>1) alpha=1; int a2=(int)(alpha*255); const char* name=state.currentTheme.name; int w=MeasureText(name,Const::HUD_THEME_FONT); DrawText(name,cfg.gameWidth/2-w/2,80,Const::HUD_THEME_FONT,{255,255,255,(unsigned char)a2}); }
-    if(settings.showFPS){ DrawText(TextFormat("FPS: %d", GetFPS()), cfg.gameWidth-Const::HUD_FPS_OFFSET_X, Const::HUD_TOP_MARGIN, 18, {255,255,255,220}); }
-    DrawText(TextFormat("Platforms: %d Theme:%s(%d)",state.generatedPlatformsCount,state.currentTheme.name,state.currentThemeIndex),10,70,14,{180,200,230,200});
-    float radius=Const::HUD_CLOCK_RADIUS; float clockX=cfg.gameWidth - radius - 20.f; float clockY=radius + 20.f; DrawCircleLines((int)clockX,(int)clockY,radius,RAYWHITE); int segmentsDone=state.speedStage; for(int s=0;s<segmentsDone && s<5;++s){ float a0=-PI/2+(2*PI/5)*s; float a1=-PI/2+(2*PI/5)*(s+1); Vector2 p0{clockX+std::cos(a0)*radius*0.9f,clockY+std::sin(a0)*radius*0.9f}; Vector2 p1{clockX+std::cos(a1)*radius*0.9f,clockY+std::sin(a1)*radius*0.9f}; DrawLineEx({clockX,clockY},p0,2.f,{180,180,255,200}); DrawLineEx({clockX,clockY},p1,2.f,{180,180,255,200}); }
-    float phase=(state.speedStage<5)?(state.stageTimer/cfg.STAGE_DURATION):0.f; float angle=(state.speedStage<5)?(-PI/2+phase*2*PI):(-PI/2-GetTime()*5.f); Vector2 hand{clockX+std::cos(angle)*radius*0.85f,clockY+std::sin(angle)*radius*0.85f}; DrawLineEx({clockX,clockY},hand,3.f,(state.speedStage<5)?Color{255,220,120,255}:Color{255,80,80,255}); DrawCircle((int)clockX,(int)clockY,3,(state.speedStage<5)?RAYWHITE:Color{255,80,80,255}); if(state.scrollActive) DrawText(TextFormat("Speed x%.2f stage %d",state.scrollSpeed/60.f,state.speedStage),(int)(clockX-radius-140),(int)(clockY+radius+4),14,{200,180,255,200});
 }
 
 void Game::DrawGameOverOverlay(){

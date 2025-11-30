@@ -349,9 +349,11 @@ void Game::UpdateGameplay(float dt){
     bool wantsDoubleJump = jumpPressed && !state.onGround && state.hasDoubleJump && !state.doubleJumpUsed && state.coyoteTimer <= 0;
 
     Vector2 prevPos=state.player.pos;
-    UpdatePlayerPhysics(state.player, effectiveDt, dir, state.onGround, cfg.MOVE_ACCEL, cfg.MAX_HSPEED, cfg.FRICTION, cfg.GRAVITY);
+    float currentFriction = state.onIce ? cfg.ICE_FRICTION : cfg.FRICTION;
+    UpdatePlayerPhysics(state.player, effectiveDt, dir, state.onGround, cfg.MOVE_ACCEL, cfg.MAX_HSPEED, currentFriction, cfg.GRAVITY);
 
     state.onGround=false;
+    state.onIce=false;
     if(state.player.vel.y>0){
         float prevBottom=prevPos.y+state.player.height;
         float currBottom=state.player.pos.y+state.player.height;
@@ -373,7 +375,7 @@ void Game::UpdateGameplay(float dt){
                     }
                     
                     if(pf.type == PlatformType::ICE) {
-                    } else {
+                        state.onIce = true;
                     }
                     
                     if(pf.type == PlatformType::CRUMBLING || pf.type == PlatformType::DISAPPEARING) {
