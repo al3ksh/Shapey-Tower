@@ -2,9 +2,11 @@
 #include <string>
 #include "raylib.h"
 struct GameSettings {
-    int configVersion = 2; 
+    int configVersion = 3; 
     int resolutionIndex = 0; 
     bool fullscreen = false;
+    bool vsync = true;
+    int targetFPS = 60;
     float master = 0.5f;
     float music = 0.5f;
     float jump = 0.5f;
@@ -15,6 +17,9 @@ struct GameSettings {
     int keyRight = KEY_D;
     int keyJump = KEY_SPACE;
     bool showFPS = false;
+    bool screenShake = true;
+    bool particles = true;
+    bool comboEffects = true;
 };
 
 bool LoadSettings(const std::string &path, GameSettings &out);

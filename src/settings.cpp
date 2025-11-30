@@ -19,6 +19,8 @@ bool LoadSettings(const std::string &path, GameSettings &out){
             if(k=="configVersion") { out.configVersion = std::stoi(v); parsedMask|=1; }
             else if(k=="resolutionIndex") { out.resolutionIndex=std::stoi(v); parsedMask|=2; }
             else if(k=="fullscreen") { out.fullscreen=(v=="1"||v=="true"); parsedMask|=4; }
+            else if(k=="vsync") { out.vsync=(v=="1"||v=="true"); }
+            else if(k=="targetFPS") { out.targetFPS=std::stoi(v); }
             else if(k=="master") { out.master=std::stof(v); parsedMask|=8; }
             else if(k=="music") { out.music=std::stof(v); parsedMask|=16; }
             else if(k=="jump") { out.jump=std::stof(v); parsedMask|=32; }
@@ -29,6 +31,9 @@ bool LoadSettings(const std::string &path, GameSettings &out){
             else if(k=="keyRight") { out.keyRight=std::stoi(v); parsedMask|=1024; }
             else if(k=="keyJump") { out.keyJump=std::stoi(v); parsedMask|=2048; }
             else if(k=="showFPS") { out.showFPS=(v=="1"||v=="true"); parsedMask|=4096; }
+            else if(k=="screenShake") { out.screenShake=(v=="1"||v=="true"); }
+            else if(k=="particles") { out.particles=(v=="1"||v=="true"); }
+            else if(k=="comboEffects") { out.comboEffects=(v=="1"||v=="true"); }
     } catch(...){ /* ignore parse errors */}
     }
     // Version left as-is; future migrations can map here. Clamp floats to 0..1.
@@ -49,6 +54,8 @@ bool SaveSettings(const std::string &path, const GameSettings &in){
     ofs << "configVersion="<< in.configVersion <<"\n";
     ofs << "resolutionIndex="<< in.resolutionIndex <<"\n";
     ofs << "fullscreen="<< (in.fullscreen?1:0) <<"\n";
+    ofs << "vsync="<< (in.vsync?1:0) <<"\n";
+    ofs << "targetFPS="<< in.targetFPS <<"\n";
     ofs << "master="<< in.master <<"\n";
     ofs << "music="<< in.music <<"\n";
     ofs << "jump="<< in.jump <<"\n";
@@ -59,5 +66,8 @@ bool SaveSettings(const std::string &path, const GameSettings &in){
     ofs << "keyRight="<< in.keyRight <<"\n";
     ofs << "keyJump="<< in.keyJump <<"\n";
     ofs << "showFPS="<< (in.showFPS?1:0) <<"\n";
+    ofs << "screenShake="<< (in.screenShake?1:0) <<"\n";
+    ofs << "particles="<< (in.particles?1:0) <<"\n";
+    ofs << "comboEffects="<< (in.comboEffects?1:0) <<"\n";
     return true;
 }

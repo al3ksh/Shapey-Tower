@@ -45,7 +45,11 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
     state.keys.right = settings.keyRight;
     state.keys.jump = settings.keyJump;
     SetExitKey(KEY_NULL);
-    SetTargetFPS(60);
+    if(settings.vsync) {
+        SetTargetFPS(GetMonitorRefreshRate(GetCurrentMonitor()));
+    } else {
+        SetTargetFPS(settings.targetFPS);
+    }
     InitAudioDevice();
     state.audio = GameAudio{};
     auto clamp01=[](float v){ return v<0?0.f:(v>1?1.f:v); };
@@ -257,8 +261,12 @@ void Game::ResetGame(){
     }
 }
 
-void Game::EmitLandingParticles(Vector2 contact,int count){ for(int i=0;i<count;i++){ float spd=60.f+(std::rand()%120); float ang=(-90.f+(std::rand()%120)-60.f)*(3.14159f/180.f); Vector2 v{std::cos(ang)*spd,std::sin(ang)*spd}; state.particles.push_back({contact,v,0.6f,0.6f,state.currentTheme.platStatic}); }}
+void Game::EmitLandingParticles(Vector2 contact,int count){ 
+    if(!settings.particles) return;
+    for(int i=0;i<count;i++){ float spd=60.f+(std::rand()%120); float ang=(-90.f+(std::rand()%120)-60.f)*(3.14159f/180.f); Vector2 v{std::cos(ang)*spd,std::sin(ang)*spd}; state.particles.push_back({contact,v,0.6f,0.6f,state.currentTheme.platStatic}); }
+}
 void Game::EmitWallBounceParticles(Vector2 contact,int count){
+    if(!settings.particles) return;
     bool left = (contact.x < state.player.width*0.5f + 2.f);
     bool right = !left;
     for(int i=0;i<count;i++){
@@ -359,7 +367,7 @@ void Game::UpdateGameplay(float dt){
                     
                     if(pf.type == PlatformType::SPRING) {
                         state.player.vel.y = cfg.BASE_JUMP_SPEED * 1.5f;
-                        TriggerShake(state.screenShake, 4.f, 0.15f);
+                        if(settings.screenShake) TriggerShake(state.screenShake, 4.f, 0.15f);
                     } else {
                         state.player.vel.y=0; state.onGround=true;
                     }
@@ -377,7 +385,7 @@ void Game::UpdateGameplay(float dt){
                         state.landingSquashActive = true;
                         state.landingSquashTime = 0.f;
                         EmitLandingParticles({state.player.pos.x+state.player.width/2, topY},14+std::rand()%8);
-                        TriggerShake(state.screenShake, 3.f, 0.1f);
+                        if(settings.screenShake) TriggerShake(state.screenShake, 3.f, 0.1f);
                     } else {
                         EmitLandingParticles({state.player.pos.x+state.player.width/2, topY},6+std::rand()%6);
                     }
@@ -388,7 +396,7 @@ void Game::UpdateGameplay(float dt){
                         int floorsJumped=(int)(deltaY/95.f); if(floorsJumped<1) floorsJumped=1;
                         if(state.comboTimer>0) state.comboCount++; else state.comboCount=1; state.comboTimer=cfg.COMBO_WINDOW;
                         
-                        if(state.comboCount >= 10) TriggerShake(state.screenShake, 2.f + state.comboCount * 0.1f, 0.08f);
+                        if(state.comboCount >= 10 && settings.screenShake) TriggerShake(state.screenShake, 2.f + state.comboCount * 0.1f, 0.08f);
                         
                         constexpr int MIN_COMBO = 10;
                         int base=50; int heightBonus=floorsJumped>1?(floorsJumped-1)*30:0;
@@ -438,10 +446,12 @@ void Game::UpdateGameplay(float dt){
             state.sessionCoins++;
             state.totalCoinsCollected++;
             state.totalCoins++;
-            for(int j=0;j<6;j++) {
-                float ang = (float)(std::rand()%360) * 3.14159f/180.f;
-                float spd = 80.f + std::rand()%60;
-                state.particles.push_back({{coin.pos.x, coin.pos.y}, {std::cos(ang)*spd, std::sin(ang)*spd}, 0.4f, 0.4f, {255,215,0,255}});
+            if(settings.particles) {
+                for(int j=0;j<6;j++) {
+                    float ang = (float)(std::rand()%360) * 3.14159f/180.f;
+                    float spd = 80.f + std::rand()%60;
+                    state.particles.push_back({{coin.pos.x, coin.pos.y}, {std::cos(ang)*spd, std::sin(ang)*spd}, 0.4f, 0.4f, {255,215,0,255}});
+                }
             }
         }
     }
@@ -480,7 +490,7 @@ void Game::UpdateGameplay(float dt){
                     break;
             }
             state.activePowerUps.push_back({pu.type, duration});
-            TriggerShake(state.screenShake, 3.f, 0.1f);
+            if(settings.screenShake) TriggerShake(state.screenShake, 3.f, 0.1f);
         }
     }
     Collectibles::UpdatePowerUps(state.powerups, dt);
@@ -548,10 +558,10 @@ void Game::UpdateGameplay(float dt){
             state.player.vel.y = cfg.BASE_JUMP_SPEED;
             state.activePowerUps.erase(std::remove_if(state.activePowerUps.begin(), state.activePowerUps.end(), 
                 [](const ActivePowerUp& p){ return p.type == PowerUpType::SHIELD; }), state.activePowerUps.end());
-            TriggerShake(state.screenShake, 8.f, 0.3f);
+            if(settings.screenShake) TriggerShake(state.screenShake, 8.f, 0.3f);
         } else if(!state.gameOver){ 
             state.gameOver=true; 
-            TriggerShake(state.screenShake, 10.f, 0.5f);
+            if(settings.screenShake) TriggerShake(state.screenShake, 10.f, 0.5f);
             if(state.isDailyRun && state.score > state.dailyChallenge.bestScore) {
                 state.dailyChallenge.bestScore = state.score;
                 state.dailyChallenge.played = true;
