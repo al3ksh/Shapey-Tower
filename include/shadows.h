@@ -1,4 +1,3 @@
-// shadows.h - simple pseudo-2D shadow system (rectangle projection)
 #pragma once
 #include "raylib.h"
 #include <vector>

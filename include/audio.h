@@ -1,4 +1,3 @@
-// Audio config
 #pragma once
 #include "raylib.h"
 

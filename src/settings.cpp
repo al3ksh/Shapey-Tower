@@ -8,7 +8,7 @@ static std::string Trim(const std::string &s){ size_t a=0; while(a<s.size() && i
 bool LoadSettings(const std::string &path, GameSettings &out){
     std::ifstream ifs(path);
     if(!ifs) return false;
-    std::string line; int parsedMask=0; // bitfield for optional diagnostics
+    std::string line; int parsedMask=0; 
     while(std::getline(ifs,line)){
         line=Trim(line);
         if(line.empty()||line[0]=='#') continue;
@@ -29,7 +29,7 @@ bool LoadSettings(const std::string &path, GameSettings &out){
             else if(k=="keyRight") { out.keyRight=std::stoi(v); parsedMask|=1024; }
             else if(k=="keyJump") { out.keyJump=std::stoi(v); parsedMask|=2048; }
             else if(k=="showFPS") { out.showFPS=(v=="1"||v=="true"); parsedMask|=4096; }
-    } catch(...){ /* ignore individual conversion errors */ }
+    } catch(...){ /* ignore parse errors */}
     }
     // Version left as-is; future migrations can map here. Clamp floats to 0..1.
     auto clamp01=[](float x){ return x<0.f?0.f:(x>1.f?1.f:x); };

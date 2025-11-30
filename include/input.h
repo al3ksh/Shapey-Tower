@@ -1,4 +1,3 @@
-// input.h - mapowanie klawiszy i funkcja nazewnictwa
 #pragma once
 #include "raylib.h"
 

@@ -2,7 +2,6 @@
 #include "debug.h"
 #include <cmath>
 
-// Draw main menu UI
 void Game::DrawMenu(){
     BeginDrawing();
     ClearBackground(Color{10,14,20,255});

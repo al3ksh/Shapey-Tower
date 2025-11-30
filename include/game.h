@@ -1,4 +1,3 @@
-// Game state & interface
 #pragma once
 #include <vector>
 #include <string>
@@ -53,7 +52,6 @@ struct GameState {
     float landingSquashDuration = 0.18f;
     float lastVerticalVelocity = 0.f;
     float hardLandingThreshold = 520.f;
-    // Fire shader
     Shader shaderFire{}; int fireLocTime=-1; int fireLocIntensity=-1; int fireLocSpriteSize=-1; int fireLocMode=-1;
     KeyBindings keys;
     enum class Screen { MENU, GAME, PAUSE, GAMEOVER };
@@ -67,6 +65,8 @@ struct GameState {
 struct GameConfig {
     int screenWidth=480;
     int screenHeight=800;
+    int gameWidth = Video::GAME_WIDTH;
+    int gameHeight = Video::GAME_HEIGHT;
     float GRAVITY=1400.f;
     float MOVE_ACCEL=3600.f;
     float MAX_HSPEED=580.f;
@@ -119,7 +119,6 @@ private:
     void ChangeScreen(GameState::Screen next, bool withFade=true);
     void EmitLandingParticles(Vector2 contact,int count);
     void EmitWallBounceParticles(Vector2 contact,int count);
-    // Helpers extracted
     void DrawResolutionSelector(int &y, float uiCenterX, Vector2 mPos, bool click, int sw);
     void DrawAudioSliders(int &y, float uiCenterX, Vector2 mPos, int sw, bool &changedOut);
     void ApplyAudioVolumes();
@@ -133,14 +132,12 @@ private:
         clicked=false; if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hover){ clicked=true; activeChanged=true; }
         y += h + 8; return rc;
     }
-    // Map window-space mouse pos do logicznej przestrzeni gry (letterbox)
     Vector2 MapWindowToLogical(Vector2 win) const {
         if(viewportRect.width<=0 || viewportRect.height<=0) return win;
-        float scale = viewportRect.width / (float)cfg.screenWidth; // uniform
+        float scale = viewportRect.width / (float)cfg.gameWidth; // uniform
         Vector2 out { (win.x - viewportRect.x)/scale, (win.y - viewportRect.y)/scale };
         return out;
     }
-    // Proste GUI helpers (inline by uniknąć dodatkowych plików)
     Rectangle GuiButtonCentered(float centerX, int &y, int w, int h, const char* label, Vector2 mouse, bool &pressedOut) const {
         int bx = (int)(centerX - w/2);
         Rectangle rc{(float)bx,(float)y,(float)w,(float)h};

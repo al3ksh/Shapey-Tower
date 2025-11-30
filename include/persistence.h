@@ -1,4 +1,3 @@
-// persistence.h - prosty zapis/odczyt highscore do pliku tekstowego
 #pragma once
 #include <string>
 

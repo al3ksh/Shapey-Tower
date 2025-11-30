@@ -1,7 +1,6 @@
-// video_settings.h - resolution/fullscreen management
 #pragma once
 #include "raylib.h"
-class Game; // forward
+class Game; 
 
 namespace VideoSettings {
     void ApplyResolution(Game& game, bool recenterCamera=true);

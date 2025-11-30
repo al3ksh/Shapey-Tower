@@ -1,4 +1,3 @@
-// debug.h - extended logger + optional simple profiler
 #pragma once
 #include <cstdio>
 #include <chrono>
@@ -9,7 +8,6 @@
 #define ST_DEBUG 1
 #endif
 
-// --- Levelled logger ---
 namespace _st_internal { inline auto LogStart() { return std::chrono::steady_clock::now(); } inline const auto kLogStart = LogStart(); inline long long MsSinceStart(){ using namespace std::chrono; return duration_cast<milliseconds>(steady_clock::now()-kLogStart).count(); } }
 
 #if ST_DEBUG
@@ -22,10 +20,8 @@ namespace _st_internal { inline auto LogStart() { return std::chrono::steady_clo
 #define LOG_WARN(fmt, ...)  std::printf("[%6lldms][WARN ] " fmt "\n", _st_internal::MsSinceStart(), ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) std::fprintf(stderr,"[%6lldms][ERROR] %s:%d: " fmt "\n", _st_internal::MsSinceStart(), __FILE__, __LINE__, ##__VA_ARGS__)
 
-// Backwards compatibility for old macro
 #define DEBUG_LOG LOG_DEBUG
 
-// LOG_ONCE - wypisz komunikat tylko raz (klucz string literal)
 #if ST_DEBUG
 	inline bool _log_once_hit(const char* key){
 		static std::unordered_map<std::string,bool> flags; auto it=flags.find(key); if(it!=flags.end()) return false; flags[key]=true; return true; }
@@ -34,7 +30,6 @@ namespace _st_internal { inline auto LogStart() { return std::chrono::steady_clo
 	#define LOG_ONCE(key, fmt, ...) do{}while(0)
 #endif
 
-// --- Profiler RAII (opcjonalny) ---
 #ifndef ST_PROFILE
 #define ST_PROFILE 0
 #endif

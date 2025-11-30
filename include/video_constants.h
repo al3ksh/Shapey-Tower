@@ -1,6 +1,8 @@
-// video_constants.h - resolutions and video constants
 #pragma once
 namespace Video {
+inline constexpr int GAME_WIDTH = 480;
+inline constexpr int GAME_HEIGHT = 800;
+
 struct Resolution { int w; int h; };
 inline constexpr Resolution RESOLUTIONS[] = {
     {480,800},{540,960},{600,1000},{720,1280},{800,1440},{900,1600},{1080,1920}

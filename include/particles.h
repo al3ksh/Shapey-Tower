@@ -1,4 +1,3 @@
-// particles.h - simple particle system extracted from Game
 #pragma once
 #include <vector>
 #include "raylib.h"
@@ -6,7 +5,6 @@
 struct Particle { Vector2 pos, vel; float life, total; Color color; };
 
 namespace Particles {
-    // Update: gravity passed as gravity * gravityScaleFactor (e.g. 0.2f)
     inline void Update(std::vector<Particle>& list, float dt, float gravity, float gravityScale){
         for(size_t i=0;i<list.size();){
             Particle &p=list[i];

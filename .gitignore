@@ -37,3 +37,7 @@ Thumbs.db
 /settings.cfg
 /build_errors.txt
 /dist
+
+# Temporary
+.TODO.txt
+todo.txt

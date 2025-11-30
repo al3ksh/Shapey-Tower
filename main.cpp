@@ -20,7 +20,7 @@ int main(){
     KeyBindings keys; bool paused=true; bool started=false; enum RebindTarget{NONE,REB_LEFT,REB_RIGHT,REB_JUMP}; RebindTarget rebindTarget=NONE;
     // Volume scale for UI sliders (0..1)
     const float VOLUME_SCALE=0.01f;
-    float volJump=0.5f, volLand=0.5f, volBounce=0.5f; // start: 0.5 * 0.1 = 0.05
+    float volJump=0.5f, volLand=0.5f, volBounce=0.5f; 
 
     Sound sndJump{}; Sound sndLand{}; Sound sndBounce{}; if(FileExists("jump.mp3")) sndJump=LoadSound("jump.mp3"); if(FileExists("land.mp3")) sndLand=LoadSound("land.mp3"); if(FileExists("bounce.mp3")) sndBounce=LoadSound("bounce.mp3");
 

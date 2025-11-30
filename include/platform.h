@@ -1,4 +1,3 @@
-// platform.h - struktura platformy oraz aktualizacja ruchu platform ruchomych
 #pragma once
 #include "raylib.h"
 #include <vector>

@@ -1,4 +1,3 @@
-// player.h - definicja struktury gracza i bazowa aktualizacja fizyki poziomej/pionowej
 #pragma once
 #include "raylib.h"
 

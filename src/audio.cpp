@@ -2,7 +2,6 @@
 #include <string>
 
 static Sound TryLoadSoundMulti(const char* base){
-    // Order: mp3, ogg, wav; search assets/audio/<base><ext> then fallback to working dir
     const char* exts[] = {".mp3",".ogg",".wav"};
     Sound s{};
     for(auto &ext: exts){
