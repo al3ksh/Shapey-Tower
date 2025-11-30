@@ -115,6 +115,9 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
             break;
         }
     }
+    state.parallaxLayers = CreateDefaultParallaxLayers();
+    state.achievements = CreateAchievements();
+    state.dailyChallenge = GetTodaysChallenge();
     ApplyResolution();
     ApplyAudioVolumes();
 }
@@ -192,14 +195,59 @@ void Game::ApplyResolution(bool recenterCamera){
 bool Game::ShouldClose() const { return !running || WindowShouldClose(); }
 
 void Game::ResetGame(){
+    if (state.isDailyRun) {
+        std::srand(state.dailyChallenge.seed);
+    }
+    
+    DifficultySettings diffSettings = GetDifficultySettings(state.difficulty);
+    
     state.score=0; state.comboTimer=0.f; state.comboCount=0; state.lastLandedPlatformIndex=0; state.gameOver=false; state.platforms.clear();
+    state.coins.clear(); state.powerups.clear(); state.activePowerUps.clear();
+    state.sessionCoins = 0;
+    state.hasDoubleJump = false; state.doubleJumpUsed = false; state.hasShield = false;
+    state.slowMotionFactor = 1.f; state.coinMagnetRange = 0.f;
+    state.activeDoubleJump = false; state.activeShield = false;
+    state.activeSlowMotion = false; state.activeMagnet = false;
+    for(int i=0; i<4; i++) state.powerUpTimers[i] = 0.f;
+    state.totalCoins = 0;
+    state.screenShake = ScreenShake{};
+    
     state.platforms.push_back({Rectangle{0,(float)cfg.gameHeight-60.f,(float)cfg.gameWidth,20.f}});
     state.player.pos = {cfg.gameWidth/2.f - state.player.width/2, state.platforms[0].rect.y - state.player.height};
     state.player.vel={0,0};
     state.currentThemeIndex=0; state.currentTheme=state.themes[0]; state.themeChangeTimer=2.f; state.generatedPlatformsCount=1; state.lastScoredPlatformIndex=-1; state.lastLandY=state.platforms[0].rect.y;
-    auto spawnPlatformLocal=[&](float y){ float w=80.f+(std::rand()%140); float x=(float)(std::rand()%(int)(cfg.gameWidth-(int)w)); Platform p; p.rect={x,y,w,18.f}; if((std::rand()%100)<25){ p.moving=true; p.baseX=x; p.moveAmplitude=40.f+(std::rand()%41); p.moveSpeed=1.f+(std::rand()%200)/100.f; } state.platforms.push_back(p); };
-    float currentY2=state.platforms[0].rect.y-100.f; for(int i=0;i<15;i++){ float gap=state.currentTheme.gapMin+(std::rand()%(int)(state.currentTheme.gapMax-state.currentTheme.gapMin+1)); currentY2-=gap; spawnPlatformLocal(currentY2); state.generatedPlatformsCount++; }
-    state.highestPlatformY=currentY2; state.cameraTopY=state.player.pos.y+state.player.height/2; state.scrollActive=false; state.speedStage=0; state.stageTimer=0.f; state.scrollSpeed=60.f;
+    
+    auto spawnPlatformLocal=[&](float y){ 
+        float w=80.f+(std::rand()%140) + diffSettings.platformWidthBonus; 
+        if(w < 60) w = 60;
+        float x=(float)(std::rand()%(int)(cfg.gameWidth-(int)w)); 
+        Platform p; p.rect={x,y,w,18.f}; 
+        
+        int typeRoll = std::rand() % 100;
+        if(typeRoll < 5) p.type = PlatformType::SPRING;
+        else if(typeRoll < 12) p.type = PlatformType::CRUMBLING;
+        else if(typeRoll < 18) p.type = PlatformType::ICE;
+        else if(typeRoll < 22) p.type = PlatformType::DISAPPEARING;
+        
+        if((std::rand()%100)<25){ p.moving=true; p.baseX=x; p.moveAmplitude=40.f+(std::rand()%41); p.moveSpeed=1.f+(std::rand()%200)/100.f; } 
+        state.platforms.push_back(p);
+        
+        if((std::rand()%100) < diffSettings.coinSpawnChance) {
+            Coin coin; coin.pos = {x + w/2, y - 30}; state.coins.push_back(coin);
+        }
+        if((std::rand()%100) < diffSettings.powerUpSpawnChance) {
+            PowerUp pu; pu.pos = {x + w/2, y - 50}; pu.type = (PowerUpType)(std::rand() % 4); state.powerups.push_back(pu);
+        }
+    };
+    
+    float gapMult = diffSettings.gapMultiplier;
+    float currentY2=state.platforms[0].rect.y-100.f; 
+    for(int i=0;i<15;i++){ 
+        float gap=(state.currentTheme.gapMin+(std::rand()%(int)(state.currentTheme.gapMax-state.currentTheme.gapMin+1))) * gapMult; 
+        currentY2-=gap; spawnPlatformLocal(currentY2); state.generatedPlatformsCount++; 
+    }
+    state.highestPlatformY=currentY2; state.cameraTopY=state.player.pos.y+state.player.height/2; state.scrollActive=false; state.speedStage=0; state.stageTimer=0.f; 
+    state.scrollSpeed=60.f * diffSettings.scrollSpeedMultiplier;
 
     if(state.musicPausedOnDeath && state.audio.musicBg.ctxData){
         StopMusicStream(state.audio.musicBg); 
@@ -265,35 +313,71 @@ void Game::Update(){
 void Game::UpdateGameplay(float dt){
     PROF_SCOPE("UpdateGameplay");
     if(state.gameOver){ ChangeScreen(GameState::Screen::GAMEOVER,false); }
+    
+    float effectiveDt = dt * state.slowMotionFactor;
+    
     state.animTime += dt;
+    UpdateShake(state.screenShake, dt);
+    
+    for (auto it = state.activePowerUps.begin(); it != state.activePowerUps.end();) {
+        it->timeRemaining -= dt;
+        if (it->timeRemaining <= 0) {
+            if (it->type == PowerUpType::SLOW_MOTION) state.slowMotionFactor = 1.f;
+            else if (it->type == PowerUpType::COIN_MAGNET) state.coinMagnetRange = 0.f;
+            else if (it->type == PowerUpType::DOUBLE_JUMP) state.hasDoubleJump = false;
+            else if (it->type == PowerUpType::SHIELD) state.hasShield = false;
+            it = state.activePowerUps.erase(it);
+        } else ++it;
+    }
+    
     if(state.landingTimer>0.f){ state.landingTimer -= dt; if(state.landingTimer<0) state.landingTimer=0; }
     state.lastVerticalVelocity = state.player.vel.y;
     float dir=0.f; if(IsKeyDown(state.keys.left)) dir-=1.f; if(IsKeyDown(state.keys.right)) dir+=1.f;
     bool jumpPressed=IsKeyPressed(state.keys.jump); bool jumpDown=IsKeyDown(state.keys.jump);
     if(jumpPressed || jumpDown) state.jumpBufferTimer=cfg.JUMP_BUFFER; else if(state.jumpBufferTimer>0) state.jumpBufferTimer-=dt;
-    if(state.onGround) state.coyoteTimer=cfg.COYOTE_TIME; else if(state.coyoteTimer>0) state.coyoteTimer-=dt;
+    if(state.onGround) { state.coyoteTimer=cfg.COYOTE_TIME; state.doubleJumpUsed = false; }
+    else if(state.coyoteTimer>0) state.coyoteTimer-=dt;
     bool wantsJump = (state.jumpBufferTimer>0 && state.coyoteTimer>0);
+    bool wantsDoubleJump = jumpPressed && !state.onGround && state.hasDoubleJump && !state.doubleJumpUsed && state.coyoteTimer <= 0;
 
     Vector2 prevPos=state.player.pos;
-    UpdatePlayerPhysics(state.player, dt, dir, state.onGround, cfg.MOVE_ACCEL, cfg.MAX_HSPEED, cfg.FRICTION, cfg.GRAVITY);
+    UpdatePlayerPhysics(state.player, effectiveDt, dir, state.onGround, cfg.MOVE_ACCEL, cfg.MAX_HSPEED, cfg.FRICTION, cfg.GRAVITY);
 
     state.onGround=false;
     if(state.player.vel.y>0){
         float prevBottom=prevPos.y+state.player.height;
         float currBottom=state.player.pos.y+state.player.height;
         for(size_t i=0;i<state.platforms.size();++i){
-            auto &pf=state.platforms[i]; float topY=pf.rect.y;
+            auto &pf=state.platforms[i]; 
+            if(pf.alpha < 0.5f) continue;
+            float topY=pf.rect.y;
             if(prevBottom<=topY && currBottom>=topY){
                 float pL=state.player.pos.x, pR=state.player.pos.x+state.player.width;
                 float platL=pf.rect.x, platR=pf.rect.x+pf.rect.width;
                 if(pR>platL && pL<platR){
                     state.player.pos.y=topY-state.player.height;
-                    state.player.vel.y=0; state.onGround=true;
+                    
+                    if(pf.type == PlatformType::SPRING) {
+                        state.player.vel.y = cfg.BASE_JUMP_SPEED * 1.5f;
+                        TriggerShake(state.screenShake, 4.f, 0.15f);
+                    } else {
+                        state.player.vel.y=0; state.onGround=true;
+                    }
+                    
+                    if(pf.type == PlatformType::ICE) {
+                    } else {
+                    }
+                    
+                    if(pf.type == PlatformType::CRUMBLING || pf.type == PlatformType::DISAPPEARING) {
+                        if(!pf.triggered) { pf.triggered = true; pf.stateTimer = 0.f; }
+                    }
+                    
                     float impactSpeed = std::fabs(state.lastVerticalVelocity);
                     if(impactSpeed >= state.hardLandingThreshold){
                         state.landingSquashActive = true;
                         state.landingSquashTime = 0.f;
                         EmitLandingParticles({state.player.pos.x+state.player.width/2, topY},14+std::rand()%8);
+                        TriggerShake(state.screenShake, 3.f, 0.1f);
                     } else {
                         EmitLandingParticles({state.player.pos.x+state.player.width/2, topY},6+std::rand()%6);
                     }
@@ -303,6 +387,9 @@ void Game::UpdateGameplay(float dt){
                         float deltaY=state.lastLandY-pf.rect.y;
                         int floorsJumped=(int)(deltaY/95.f); if(floorsJumped<1) floorsJumped=1;
                         if(state.comboTimer>0) state.comboCount++; else state.comboCount=1; state.comboTimer=cfg.COMBO_WINDOW;
+                        
+                        if(state.comboCount >= 10) TriggerShake(state.screenShake, 2.f + state.comboCount * 0.1f, 0.08f);
+                        
                         constexpr int MIN_COMBO = 10;
                         int base=50; int heightBonus=floorsJumped>1?(floorsJumped-1)*30:0;
                         int effectiveMultiplier = (state.comboCount >= MIN_COMBO) ? state.comboCount : 1; 
@@ -314,29 +401,165 @@ void Game::UpdateGameplay(float dt){
             }
         }
     }
+    
     if(wantsJump){
-    float speedRatio=std::fmin(std::fabs(state.player.vel.x)/cfg.MAX_HSPEED,1.f);
+        float speedRatio=std::fmin(std::fabs(state.player.vel.x)/cfg.MAX_HSPEED,1.f);
         float jumpSpeed=cfg.BASE_JUMP_SPEED - cfg.EXTRA_JUMP_BOOST*speedRatio;
-    state.player.vel.y=jumpSpeed; state.onGround=false; state.coyoteTimer=0.f; state.jumpBufferTimer=0.f;
-    state.landingSquashActive = false;
-    if(state.audio.sndJump.frameCount>0){ SetSoundVolume(state.audio.sndJump, state.audio.volJump * VOL_JUMP_MULT * VOLUME_SCALE); PlaySound(state.audio.sndJump);} 
+        state.player.vel.y=jumpSpeed; state.onGround=false; state.coyoteTimer=0.f; state.jumpBufferTimer=0.f;
+        state.landingSquashActive = false;
+        if(state.audio.sndJump.frameCount>0){ SetSoundVolume(state.audio.sndJump, state.audio.volJump * VOL_JUMP_MULT * VOLUME_SCALE); PlaySound(state.audio.sndJump);} 
+    } else if(wantsDoubleJump) {
+        state.player.vel.y = cfg.BASE_JUMP_SPEED * 0.85f;
+        state.doubleJumpUsed = true;
+        state.jumpBufferTimer = 0.f;
+        if(state.audio.sndJump.frameCount>0){ SetSoundVolume(state.audio.sndJump, state.audio.volJump * VOL_JUMP_MULT * VOLUME_SCALE * 0.8f); PlaySound(state.audio.sndJump);}
     }
+    
     if(state.comboTimer>0){ state.comboTimer-=dt; if(state.comboTimer<=0){ state.comboTimer=0; state.comboCount=0; }}
 
     const float restitution=0.95f; const float wallImpulse=80.f; if(state.player.pos.x<0.f){ state.player.pos.x=0.f; if(state.player.vel.x<0){ state.player.vel.x=-state.player.vel.x*restitution + wallImpulse; EmitWallBounceParticles({0.f,state.player.pos.y+state.player.height/2},6); if(state.audio.sndBounce.frameCount>0){ SetSoundVolume(state.audio.sndBounce, state.audio.volBounce*VOLUME_SCALE); PlaySound(state.audio.sndBounce);} } } if(state.player.pos.x+state.player.width>(float)cfg.gameWidth){ state.player.pos.x=(float)cfg.gameWidth-state.player.width; if(state.player.vel.x>0){ state.player.vel.x=-state.player.vel.x*restitution - wallImpulse; EmitWallBounceParticles({(float)cfg.gameWidth,state.player.pos.y+state.player.height/2},6); if(state.audio.sndBounce.frameCount>0){ SetSoundVolume(state.audio.sndBounce, state.audio.volBounce*VOLUME_SCALE); PlaySound(state.audio.sndBounce);} } }
 
     UpdateMovingPlatforms(state.platforms);
+    UpdatePlatformStates(state.platforms, effectiveDt);
+    
+    Vector2 playerCenter = {state.player.pos.x + state.player.width/2, state.player.pos.y + state.player.height/2};
+    for(auto& coin : state.coins) {
+        if(coin.collected) continue;
+        float dist = std::sqrt(std::pow(coin.pos.x - playerCenter.x, 2) + std::pow(coin.pos.y - playerCenter.y, 2));
+        if(state.coinMagnetRange > 0 && dist < state.coinMagnetRange) {
+            float dx = playerCenter.x - coin.pos.x;
+            float dy = playerCenter.y - coin.pos.y;
+            float len = std::sqrt(dx*dx + dy*dy);
+            if(len > 1) { coin.pos.x += (dx/len) * 300.f * dt; coin.pos.y += (dy/len) * 300.f * dt; }
+        }
+        if(dist < coin.radius + 20.f) {
+            coin.collected = true;
+            state.score += coin.value;
+            state.sessionCoins++;
+            state.totalCoinsCollected++;
+            state.totalCoins++;
+            for(int j=0;j<6;j++) {
+                float ang = (float)(std::rand()%360) * 3.14159f/180.f;
+                float spd = 80.f + std::rand()%60;
+                state.particles.push_back({{coin.pos.x, coin.pos.y}, {std::cos(ang)*spd, std::sin(ang)*spd}, 0.4f, 0.4f, {255,215,0,255}});
+            }
+        }
+    }
+    Collectibles::UpdateCoins(state.coins, dt);
+    
+    for(auto& pu : state.powerups) {
+        if(pu.collected) continue;
+        float dist = std::sqrt(std::pow(pu.pos.x - playerCenter.x, 2) + std::pow(pu.pos.y - playerCenter.y, 2));
+        if(dist < pu.radius + 20.f) {
+            pu.collected = true;
+            float duration = 10.f;
+            switch(pu.type) {
+                case PowerUpType::DOUBLE_JUMP: 
+                    state.hasDoubleJump = true; 
+                    state.activeDoubleJump = true;
+                    state.powerUpTimers[0] = 15.f;
+                    duration = 15.f; 
+                    break;
+                case PowerUpType::SHIELD: 
+                    state.hasShield = true; 
+                    state.activeShield = true;
+                    state.powerUpTimers[1] = 12.f;
+                    duration = 12.f; 
+                    break;
+                case PowerUpType::SLOW_MOTION: 
+                    state.slowMotionFactor = 0.6f; 
+                    state.activeSlowMotion = true;
+                    state.powerUpTimers[2] = 8.f;
+                    duration = 8.f; 
+                    break;
+                case PowerUpType::COIN_MAGNET: 
+                    state.coinMagnetRange = 150.f; 
+                    state.activeMagnet = true;
+                    state.powerUpTimers[3] = 10.f;
+                    duration = 10.f; 
+                    break;
+            }
+            state.activePowerUps.push_back({pu.type, duration});
+            TriggerShake(state.screenShake, 3.f, 0.1f);
+        }
+    }
+    Collectibles::UpdatePowerUps(state.powerups, dt);
+    
+    for(int i=0; i<4; i++) {
+        if(state.powerUpTimers[i] > 0) state.powerUpTimers[i] -= dt;
+    }
+    if(state.powerUpTimers[0] <= 0) { state.activeDoubleJump = false; state.hasDoubleJump = false; }
+    if(state.powerUpTimers[1] <= 0) { state.activeShield = false; state.hasShield = false; }
+    if(state.powerUpTimers[2] <= 0) { state.activeSlowMotion = false; state.slowMotionFactor = 1.f; }
+    if(state.powerUpTimers[3] <= 0) { state.activeMagnet = false; state.coinMagnetRange = 0.f; }
+    
+    for(auto& ach : state.achievements) {
+        if(!ach.unlocked && ach.condition(state.score, state.comboCount, state.totalCoinsCollected, state.generatedPlatformsCount)) {
+            ach.unlocked = true;
+            state.lastUnlockedAchievement = ach.name;
+            state.achievementPopupTimer = 3.f;
+        }
+    }
+    if(state.achievementPopupTimer > 0) state.achievementPopupTimer -= dt;
 
+    DifficultySettings diffSettings = GetDifficultySettings(state.difficulty);
     auto applyThemeIfNeeded=[&](){ int stage=state.generatedPlatformsCount/PLATFORMS_PER_THEME; int nextTheme=stage%(int)state.themes.size(); if(nextTheme!=state.currentThemeIndex){ state.currentThemeIndex=nextTheme; state.currentTheme=state.themes[state.currentThemeIndex]; state.themeChangeTimer=3.f; if(state.audio.sndThemeChange.frameCount>0){ SetSoundVolume(state.audio.sndThemeChange, state.audio.volThemeChange * VOL_THEME_MULT * VOLUME_SCALE); PlaySound(state.audio.sndThemeChange);} } };
-    auto spawnPlatform=[&](float y){ float width=80.f+(std::rand()%140); float x=(float)(std::rand()%(int)(cfg.gameWidth-(int)width)); Platform p; p.rect={x,y,width,18.f}; if((std::rand()%100)<state.currentTheme.moveChance){ p.moving=true; p.baseX=x; p.moveAmplitude=40.f+(std::rand()%41); p.moveSpeed=1.f+(std::rand()%200)/100.f; } state.platforms.push_back(p); state.generatedPlatformsCount++; applyThemeIfNeeded(); };
+    auto spawnPlatform=[&](float y){ 
+        float width=80.f+(std::rand()%140) + diffSettings.platformWidthBonus; 
+        if(width < 60) width = 60;
+        float x=(float)(std::rand()%(int)(cfg.gameWidth-(int)width)); 
+        Platform p; p.rect={x,y,width,18.f}; 
+        
+        int typeRoll = std::rand() % 100;
+        if(typeRoll < 5) p.type = PlatformType::SPRING;
+        else if(typeRoll < 12) p.type = PlatformType::CRUMBLING;
+        else if(typeRoll < 18) p.type = PlatformType::ICE;
+        else if(typeRoll < 22) p.type = PlatformType::DISAPPEARING;
+        
+        if((std::rand()%100)<state.currentTheme.moveChance){ p.moving=true; p.baseX=x; p.moveAmplitude=40.f+(std::rand()%41); p.moveSpeed=1.f+(std::rand()%200)/100.f; } 
+        state.platforms.push_back(p); 
+        state.generatedPlatformsCount++; 
+        applyThemeIfNeeded();
+        
+        if((std::rand()%100) < diffSettings.coinSpawnChance) {
+            Coin coin; coin.pos = {x + width/2, y - 30}; state.coins.push_back(coin);
+        }
+        if((std::rand()%100) < diffSettings.powerUpSpawnChance) {
+            PowerUp pu; pu.pos = {x + width/2, y - 50}; pu.type = (PowerUpType)(std::rand() % 4); state.powerups.push_back(pu);
+        }
+    };
 
+    float gapMult = diffSettings.gapMultiplier;
     float genThreshold=state.cameraTopY - 800.f;
-    while(state.highestPlatformY>genThreshold){ float dynamicMax=state.currentTheme.gapMax - state.speedStage*5.f - (state.scrollActive?10.f:0.f); if(dynamicMax<state.currentTheme.gapMin+5.f) dynamicMax=state.currentTheme.gapMin+5.f; float gap=state.currentTheme.gapMin + (std::rand()%(int)(dynamicMax-state.currentTheme.gapMin+1)); state.highestPlatformY -= gap; spawnPlatform(state.highestPlatformY);} 
+    while(state.highestPlatformY>genThreshold){ float dynamicMax=state.currentTheme.gapMax - state.speedStage*5.f - (state.scrollActive?10.f:0.f); if(dynamicMax<state.currentTheme.gapMin+5.f) dynamicMax=state.currentTheme.gapMin+5.f; float gap=(state.currentTheme.gapMin + (std::rand()%(int)(dynamicMax-state.currentTheme.gapMin+1))) * gapMult; state.highestPlatformY -= gap; spawnPlatform(state.highestPlatformY);} 
 
     float desiredY=state.player.pos.y+state.player.height/2; if(desiredY < state.cameraTopY - cfg.deadzone) state.cameraTopY = desiredY + cfg.deadzone; if(state.scrollActive){ state.stageTimer += dt; if(state.speedStage<5 && state.stageTimer>=cfg.STAGE_DURATION){ state.stageTimer-=cfg.STAGE_DURATION; state.speedStage++; if(state.speedStage<5) state.scrollSpeed*=1.25f; } state.cameraTopY -= state.scrollSpeed*dt; float topLimit=state.player.pos.y+state.player.height/2+cfg.deadzone; if(state.cameraTopY > topLimit) state.cameraTopY = topLimit; }
-    state.camera.target={(float)cfg.gameWidth/2,state.cameraTopY};
-    float cleanupY = state.cameraTopY + cfg.gameHeight + 300.f; if(state.platforms.size()>50){ state.platforms.erase(std::remove_if(state.platforms.begin(),state.platforms.end(),[&](const Platform &p){ return p.rect.y > cleanupY; }), state.platforms.end()); }
-    float loseThreshold=state.cameraTopY + cfg.gameHeight/2.f + 40.f; if(state.player.pos.y > loseThreshold){ if(!state.gameOver){ state.gameOver=true; if(state.audio.musicBg.ctxData){ PauseMusicStream(state.audio.musicBg); state.musicPausedOnDeath=true; } if(state.audio.sndDeath.frameCount>0){ SetSoundVolume(state.audio.sndDeath, state.audio.volDeath * VOL_DEATH_MULT * VOLUME_SCALE); PlaySound(state.audio.sndDeath);} } }
+    state.camera.target={(float)cfg.gameWidth/2 + state.screenShake.offset.x, state.cameraTopY + state.screenShake.offset.y};
+    
+    float cleanupY = state.cameraTopY + cfg.gameHeight + 300.f; 
+    if(state.platforms.size()>50){ state.platforms.erase(std::remove_if(state.platforms.begin(),state.platforms.end(),[&](const Platform &p){ return p.rect.y > cleanupY; }), state.platforms.end()); }
+    state.coins.erase(std::remove_if(state.coins.begin(), state.coins.end(), [&](const Coin& c){ return c.pos.y > cleanupY; }), state.coins.end());
+    state.powerups.erase(std::remove_if(state.powerups.begin(), state.powerups.end(), [&](const PowerUp& p){ return p.pos.y > cleanupY; }), state.powerups.end());
+    
+    float loseThreshold=state.cameraTopY + cfg.gameHeight/2.f + 40.f; 
+    if(state.player.pos.y > loseThreshold){ 
+        if(state.hasShield) {
+            state.hasShield = false;
+            state.player.vel.y = cfg.BASE_JUMP_SPEED;
+            state.activePowerUps.erase(std::remove_if(state.activePowerUps.begin(), state.activePowerUps.end(), 
+                [](const ActivePowerUp& p){ return p.type == PowerUpType::SHIELD; }), state.activePowerUps.end());
+            TriggerShake(state.screenShake, 8.f, 0.3f);
+        } else if(!state.gameOver){ 
+            state.gameOver=true; 
+            TriggerShake(state.screenShake, 10.f, 0.5f);
+            if(state.isDailyRun && state.score > state.dailyChallenge.bestScore) {
+                state.dailyChallenge.bestScore = state.score;
+                state.dailyChallenge.played = true;
+            }
+            if(state.audio.musicBg.ctxData){ PauseMusicStream(state.audio.musicBg); state.musicPausedOnDeath=true; } 
+            if(state.audio.sndDeath.frameCount>0){ SetSoundVolume(state.audio.sndDeath, state.audio.volDeath * VOL_DEATH_MULT * VOLUME_SCALE); PlaySound(state.audio.sndDeath);} 
+        } 
+    }
 }
 
 void Game::AutoSaveSettings(float dt){

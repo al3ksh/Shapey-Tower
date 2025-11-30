@@ -1,5 +1,7 @@
 #include "game.h"
 #include "debug.h"
+#include "difficulty.h"
+#include "daily_challenge.h"
 #include <cmath>
 
 void Game::DrawMenu(){
@@ -17,9 +19,45 @@ void Game::DrawMenu(){
     bool click=IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
     auto clampX=[&](int desired,int w){ int x=desired; if(x<10) x=10; if(x+w>sw-10) x=sw-10-w; return x; };
     bool pressed=false;
-    GuiButtonCentered(uiCenterX, y, 300,40, "Start", mPos, pressed); if(pressed){ ResetGame(); state.started=true; state.paused=false; ChangeScreen(GameState::Screen::GAME); }
+    GuiButtonCentered(uiCenterX, y, 300,40, "Start", mPos, pressed); if(pressed){ state.isDailyRun = false; ResetGame(); state.started=true; state.paused=false; ChangeScreen(GameState::Screen::GAME); }
     y -= UiLayout::CompactPullUp;
+    
+    GuiButtonCentered(uiCenterX, y, 300,40, "Daily Challenge", mPos, pressed); 
+    if(pressed){ 
+        state.isDailyRun = true; 
+        state.dailyChallenge = GetTodaysChallenge();
+        state.difficulty = Difficulty::NORMAL;
+        ResetGame(); 
+        state.started=true; 
+        state.paused=false; 
+        ChangeScreen(GameState::Screen::GAME); 
+    }
+    y -= UiLayout::CompactPullUp;
+    
     GuiButtonCentered(uiCenterX, y, 300,40, "Wyjscie", mPos, pressed); if(pressed){ running=false; }
+    y += 10;
+    
+    DrawText("Trudnosc:", clampX((int)(uiCenterX - 150),300), y, 18, RAYWHITE); y+=24;
+    int diffW=300; int diffH=30; int diffX=clampX((int)(uiCenterX - diffW/2),diffW);
+    const char* diffNames[] = {"EASY", "NORMAL", "HARD"};
+    int diffCount = 3;
+    int btnW = (diffW - 10) / diffCount;
+    for(int i=0; i<diffCount; i++) {
+        Rectangle diffRect{(float)(diffX + i*(btnW+5)), (float)y, (float)btnW, (float)diffH};
+        bool selected = ((int)state.difficulty == i);
+        Color diffCol = selected ? Color{80,160,80,255} : (CheckCollisionPointRec(mPos,diffRect) ? Color{70,110,160,255} : Color{55,80,120,255});
+        DrawRectangleRec(diffRect, diffCol);
+        DrawRectangleLines((int)diffRect.x, (int)diffRect.y, (int)diffRect.width, (int)diffRect.height, selected ? Color{120,255,120,255} : RAYWHITE);
+        int dtw = MeasureText(diffNames[i], 16);
+        DrawText(diffNames[i], (int)(diffRect.x + diffRect.width/2 - dtw/2), (int)(diffRect.y + 7), 16, RAYWHITE);
+        if(click && CheckCollisionPointRec(mPos, diffRect)) {
+            state.difficulty = (Difficulty)i;
+            settingsDirty = true;
+            settingsSaveTimer = 0.f;
+        }
+    }
+    y += diffH + 18;
+    
     y -= UiLayout::CompactPullUp;
     DrawText("Video:", clampX((int)(uiCenterX - 150),300), y, 18, RAYWHITE); y+=28;
     DrawResolutionSelector(y, uiCenterX, mPos, click, sw);

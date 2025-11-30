@@ -12,6 +12,12 @@
 #include "settings.h"
 #include "particles.h"
 #include "video_constants.h"
+#include "collectibles.h"
+#include "difficulty.h"
+#include "daily_challenge.h"
+#include "screen_shake.h"
+#include "parallax.h"
+#include "achievements.h"
 
 namespace UiLayout {
     inline constexpr int ButtonGap = 18;
@@ -54,12 +60,41 @@ struct GameState {
     float hardLandingThreshold = 520.f;
     Shader shaderFire{}; int fireLocTime=-1; int fireLocIntensity=-1; int fireLocSpriteSize=-1; int fireLocMode=-1;
     KeyBindings keys;
-    enum class Screen { MENU, GAME, PAUSE, GAMEOVER };
+    enum class Screen { MENU, GAME, PAUSE, GAMEOVER, DAILY };
     Screen currentScreen = Screen::MENU;
     float fadeAlpha = 0.f;
     float fadeTarget = 0.f;
     float fadeSpeed = 2.5f;
     bool musicPausedOnDeath = false;
+    
+    std::vector<Coin> coins;
+    std::vector<PowerUp> powerups;
+    std::vector<ActivePowerUp> activePowerUps;
+    int totalCoinsCollected = 0;
+    int totalCoins = 0;
+    int sessionCoins = 0;
+    bool hasDoubleJump = false;
+    bool doubleJumpUsed = false;
+    bool hasShield = false;
+    float slowMotionFactor = 1.f;
+    float coinMagnetRange = 0.f;
+    
+    bool activeDoubleJump = false;
+    bool activeShield = false;
+    bool activeSlowMotion = false;
+    bool activeMagnet = false;
+    float powerUpTimers[4] = {0.f, 0.f, 0.f, 0.f};
+    
+    Difficulty difficulty = Difficulty::NORMAL;
+    DailyChallenge dailyChallenge;
+    bool isDailyRun = false;
+    
+    ScreenShake screenShake;
+    std::vector<ParallaxLayer> parallaxLayers;
+    
+    std::vector<Achievement> achievements;
+    std::string lastUnlockedAchievement;
+    float achievementPopupTimer = 0.f;
 };
 
 struct GameConfig {

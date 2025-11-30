@@ -1,5 +1,6 @@
 #include "game.h"
 #include "raylib.h"
+#include "collectibles.h"
 
 #include "debug.h"
 #include "constants.h"
@@ -7,11 +8,54 @@ static void DrawVerticalGradient(int w,int h, Color top, Color bottom){
     for(int y=0;y<h;y+=Const::GRADIENT_STEP){ float k=(float)y/h; unsigned char r=(unsigned char)(top.r+(bottom.r-top.r)*k); unsigned char g=(unsigned char)(top.g+(bottom.g-top.g)*k); unsigned char b=(unsigned char)(top.b+(bottom.b-top.b)*k); DrawRectangle(0,y,w,Const::GRADIENT_STEP,{r,g,b,255}); }
 }
 
+static Color GetPlatformColor(const Platform& pf, Color baseMoving, Color baseStatic) {
+    Color base = pf.moving ? baseMoving : baseStatic;
+    switch(pf.type) {
+        case PlatformType::CRUMBLING:
+            return Color{180, 120, 80, (unsigned char)(255 * (1.0f - pf.crumbleProgress * 0.5f))};
+        case PlatformType::SPRING:
+            return Color{80, 200, 120, 255};
+        case PlatformType::ICE:
+            return Color{150, 220, 255, 230};
+        case PlatformType::DISAPPEARING:
+            return Color{base.r, base.g, base.b, (unsigned char)(pf.alpha * 255)};
+        default:
+            return base;
+    }
+}
+
 void Game::DrawGameWorld(float dt){
     DrawVerticalGradient(cfg.gameWidth,cfg.gameHeight, state.currentTheme.bgTop, state.currentTheme.bgBottom);
     Particles::Update(state.particles, dt, cfg.GRAVITY, 0.2f);
     BeginMode2D(state.camera);
-    for(auto &pf:state.platforms){ Color c=pf.moving?state.currentTheme.platMoving:state.currentTheme.platStatic; DrawRectangleRec(pf.rect,c); DrawRectangle((int)pf.rect.x,(int)pf.rect.y,(int)pf.rect.width,3,{255,255,255,60}); DrawRectangleLines((int)pf.rect.x,(int)pf.rect.y,(int)pf.rect.width,(int)pf.rect.height,{255,255,255,30}); }
+    for(auto &pf:state.platforms){ 
+        if(!pf.visible) continue;
+        Color c = GetPlatformColor(pf, state.currentTheme.platMoving, state.currentTheme.platStatic);
+        DrawRectangleRec(pf.rect,c); 
+        if(pf.type == PlatformType::SPRING) {
+            float springY = pf.rect.y - 5 + std::sin(state.animTime * 8.f) * 2.f;
+            DrawRectangle((int)(pf.rect.x + pf.rect.width/4), (int)springY, (int)(pf.rect.width/2), 5, Color{50,180,90,255});
+        }
+        if(pf.type == PlatformType::ICE) {
+            for(int i=0; i<3; i++) {
+                float sparkleX = pf.rect.x + (i+1) * pf.rect.width/4.f;
+                float sparkleY = pf.rect.y + 3;
+                unsigned char a = (unsigned char)(180 + 75 * std::sin(state.animTime * 4.f + i));
+                DrawCircle((int)sparkleX, (int)sparkleY, 2, Color{255,255,255,a});
+            }
+        }
+        if(pf.type == PlatformType::CRUMBLING && pf.crumbleProgress > 0) {
+            int cracks = (int)(pf.crumbleProgress * 5);
+            for(int i=0; i<cracks; i++) {
+                float cx = pf.rect.x + (i+1) * pf.rect.width / (cracks+1);
+                DrawLine((int)cx, (int)pf.rect.y, (int)(cx + 3), (int)(pf.rect.y + pf.rect.height), Color{60,40,20,200});
+            }
+        }
+        DrawRectangle((int)pf.rect.x,(int)pf.rect.y,(int)pf.rect.width,3,{255,255,255,60}); 
+        DrawRectangleLines((int)pf.rect.x,(int)pf.rect.y,(int)pf.rect.width,(int)pf.rect.height,{255,255,255,30}); 
+    }
+    Collectibles::DrawCoins(state.coins, state.animTime);
+    Collectibles::DrawPowerUps(state.powerups, state.animTime);
     Particles::Draw(state.particles);
     if(state.playerTexture.id>0){
         Rectangle src{0,0,(float)state.playerTexture.width,(float)state.playerTexture.height};
@@ -34,6 +78,32 @@ void Game::DrawHud(float dt){
     if(state.currentScreen==GameState::Screen::GAMEOVER) return; 
     DrawText(TextFormat("Score: %d  Best: %d",state.score,state.highScore),10,Const::HUD_TOP_MARGIN,Const::HUD_SCORE_FONT,RAYWHITE);
     constexpr int MIN_COMBO=Const::COMBO_MIN_MULT; unsigned char a=(state.comboTimer>0)?255:70; Color col=(state.comboCount>=MIN_COMBO && state.comboTimer>0)?Color{255,200,100,a}:Color{160,160,160,a}; DrawText(TextFormat("Combo x%d",state.comboCount),10,40,Const::HUD_COMBO_FONT,col);
+    DrawCircle(cfg.gameWidth - 80, 45, 8, GOLD);
+    DrawText(TextFormat("%d", state.totalCoins), cfg.gameWidth - 65, 38, 20, GOLD);
+    int powerUpY = 90;
+    if(state.activeDoubleJump && state.powerUpTimers[0] > 0) {
+        float pct = state.powerUpTimers[0] / 10.0f;
+        DrawRectangle(10, powerUpY, (int)(100 * pct), 12, Color{100, 200, 255, 200});
+        DrawText("2x Jump", 15, powerUpY - 2, 14, WHITE);
+        powerUpY += 18;
+    }
+    if(state.activeShield && state.powerUpTimers[1] > 0) {
+        float pct = state.powerUpTimers[1] / 10.0f;
+        DrawRectangle(10, powerUpY, (int)(100 * pct), 12, Color{100, 255, 150, 200});
+        DrawText("Shield", 15, powerUpY - 2, 14, WHITE);
+        powerUpY += 18;
+    }
+    if(state.activeSlowMotion && state.powerUpTimers[2] > 0) {
+        float pct = state.powerUpTimers[2] / 10.0f;
+        DrawRectangle(10, powerUpY, (int)(100 * pct), 12, Color{200, 150, 255, 200});
+        DrawText("Slow", 15, powerUpY - 2, 14, WHITE);
+        powerUpY += 18;
+    }
+    if(state.activeMagnet && state.powerUpTimers[3] > 0) {
+        float pct = state.powerUpTimers[3] / 10.0f;
+        DrawRectangle(10, powerUpY, (int)(100 * pct), 12, Color{255, 200, 100, 200});
+        DrawText("Magnet", 15, powerUpY - 2, 14, WHITE);
+    }
     if(state.themeChangeTimer>0){ state.themeChangeTimer-=dt; float alpha=state.themeChangeTimer/3.f; if(alpha<0) alpha=0; if(alpha>1) alpha=1; int a2=(int)(alpha*255); const char* name=state.currentTheme.name; int w=MeasureText(name,Const::HUD_THEME_FONT); DrawText(name,cfg.gameWidth/2-w/2,80,Const::HUD_THEME_FONT,{255,255,255,(unsigned char)a2}); }
     if(settings.showFPS){ DrawText(TextFormat("FPS: %d", GetFPS()), cfg.gameWidth-Const::HUD_FPS_OFFSET_X, Const::HUD_TOP_MARGIN, 18, {255,255,255,220}); }
     DrawText(TextFormat("Platforms: %d Theme:%s(%d)",state.generatedPlatformsCount,state.currentTheme.name,state.currentThemeIndex),10,70,14,{180,200,230,200});
