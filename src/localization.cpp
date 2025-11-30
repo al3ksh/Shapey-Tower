@@ -1,0 +1,99 @@
+#include "localization.h"
+
+static Language currentLanguage = Language::EN;
+
+Language Loc::GetLanguage() { return currentLanguage; }
+void Loc::SetLanguage(Language lang) { currentLanguage = lang; }
+
+// Helper macro for bilingual strings
+#define LOC(en, pl) (currentLanguage == Language::EN ? (en) : (pl))
+
+// UI - Tabs
+const char* Loc::Tab_Game() { return LOC("GAME", "GRA"); }
+const char* Loc::Tab_Video() { return "VIDEO"; }
+const char* Loc::Tab_Audio() { return "AUDIO"; }
+const char* Loc::Tab_Keys() { return LOC("KEYS", "KLAWISZE"); }
+const char* Loc::Tab_Effects() { return LOC("EFFECTS", "EFEKTY"); }
+
+// Main Menu - Game tab
+const char* Loc::Menu_Title() { return "SHAPEY TOWER"; }
+const char* Loc::Menu_StartGame() { return LOC("Start Game", "Rozpocznij gre"); }
+const char* Loc::Menu_Difficulty() { return LOC("Difficulty:", "Poziom trudnosci:"); }
+const char* Loc::Menu_Easy() { return LOC("EASY", "LATWY"); }
+const char* Loc::Menu_Normal() { return LOC("NORMAL", "NORMALNY"); }
+const char* Loc::Menu_Hard() { return LOC("HARD", "TRUDNY"); }
+const char* Loc::Menu_EasyDesc() { return LOC("Wider platforms, more coins", "Szersze platformy, wiecej monet"); }
+const char* Loc::Menu_NormalDesc() { return LOC("Standard settings", "Standardowe ustawienia"); }
+const char* Loc::Menu_HardDesc() { return LOC("Narrow platforms, faster pace", "Wezsze platformy, szybsze tempo"); }
+const char* Loc::Menu_Play() { return LOC("PLAY", "GRAJ"); }
+const char* Loc::Menu_DailyChallenge() { return "Daily Challenge"; }
+const char* Loc::Menu_Today() { return LOC("Today:", "Dzis:"); }
+const char* Loc::Menu_Exit() { return LOC("EXIT", "WYJSCIE"); }
+const char* Loc::Menu_HighScore() { return LOC("High Score:", "Najlepszy wynik:"); }
+
+// Main Menu - Video tab
+const char* Loc::Video_Title() { return "Video"; }
+const char* Loc::Video_Resolution() { return LOC("Resolution:", "Rozdzielczosc:"); }
+const char* Loc::Video_Fullscreen() { return LOC("Fullscreen", "Pelny ekran"); }
+const char* Loc::Video_VSync() { return "VSync"; }
+const char* Loc::Video_FPSLimit() { return LOC("FPS Limit:", "Limit FPS:"); }
+const char* Loc::Video_ShowFPS() { return LOC("Show FPS", "Pokazuj FPS"); }
+
+// Main Menu - Audio tab
+const char* Loc::Audio_Title() { return "Audio"; }
+const char* Loc::Audio_Master() { return LOC("Master Volume", "Glosnosc glowna"); }
+const char* Loc::Audio_Music() { return LOC("Music", "Muzyka"); }
+const char* Loc::Audio_Jump() { return LOC("Jump", "Skok"); }
+const char* Loc::Audio_Bounce() { return LOC("Bounce", "Odbicie"); }
+const char* Loc::Audio_Death() { return LOC("Death", "Smierc"); }
+const char* Loc::Audio_ThemeChange() { return LOC("Theme Change", "Zmiana tematu"); }
+const char* Loc::Audio_Default() { return LOC("Default", "Domyslne"); }
+
+// Main Menu - Keys tab
+const char* Loc::Keys_Title() { return LOC("Controls", "Sterowanie"); }
+const char* Loc::Keys_MoveLeft() { return LOC("Move Left", "Ruch w lewo"); }
+const char* Loc::Keys_MoveRight() { return LOC("Move Right", "Ruch w prawo"); }
+const char* Loc::Keys_Jump() { return LOC("Jump", "Skok"); }
+const char* Loc::Keys_PressKey() { return LOC("Press a key...", "Nacisnij klawisz..."); }
+const char* Loc::Keys_Default() { return LOC("Default", "Domyslne"); }
+
+// Main Menu - Effects tab
+const char* Loc::Effects_Title() { return LOC("Effects", "Efekty"); }
+const char* Loc::Effects_ScreenShake() { return LOC("Screen Shake", "Trzesienie ekranu"); }
+const char* Loc::Effects_Particles() { return LOC("Particles", "Czasteczki"); }
+const char* Loc::Effects_ComboFire() { return LOC("Combo Fire Effect", "Efekt combo (ogien)"); }
+const char* Loc::Effects_ResetAll() { return LOC("Reset All", "Reset wszystkiego"); }
+
+// Pause Menu
+const char* Loc::Pause_Title() { return LOC("PAUSED", "PAUZA"); }
+const char* Loc::Pause_Resume() { return LOC("RESUME", "WZNOW"); }
+const char* Loc::Pause_Restart() { return LOC("RESTART", "RESTART"); }
+const char* Loc::Pause_MainMenu() { return LOC("MAIN MENU", "MENU GLOWNE"); }
+const char* Loc::Pause_Exit() { return LOC("EXIT", "WYJSCIE"); }
+const char* Loc::Pause_Score() { return LOC("Score:", "Wynik:"); }
+const char* Loc::Pause_EscResume() { return LOC("ESC = resume", "ESC = wznow gre"); }
+
+// HUD
+const char* Loc::HUD_Score() { return LOC("Score:", "Wynik:"); }
+const char* Loc::HUD_Best() { return LOC("Best:", "Najlepszy:"); }
+const char* Loc::HUD_Combo() { return "Combo"; }
+const char* Loc::HUD_Platforms() { return LOC("Platforms:", "Platformy:"); }
+const char* Loc::HUD_Theme() { return LOC("Theme:", "Temat:"); }
+const char* Loc::HUD_Speed() { return LOC("Speed", "Predkosc"); }
+const char* Loc::HUD_Stage() { return LOC("stage", "etap"); }
+const char* Loc::HUD_DoubleJump() { return LOC("2x Jump", "2x Skok"); }
+const char* Loc::HUD_Shield() { return LOC("Shield", "Tarcza"); }
+const char* Loc::HUD_Slow() { return LOC("Slow", "Spowolnienie"); }
+const char* Loc::HUD_Magnet() { return LOC("Magnet", "Magnes"); }
+
+// Game Over
+const char* Loc::GameOver_Title() { return "GAME OVER"; }
+const char* Loc::GameOver_Score() { return LOC("Score:", "Wynik:"); }
+const char* Loc::GameOver_Best() { return LOC("Best:", "Najlepszy:"); }
+const char* Loc::GameOver_Restart() { return "Restart"; }
+const char* Loc::GameOver_Menu() { return "Menu"; }
+const char* Loc::GameOver_Exit() { return LOC("Exit", "Wyjscie"); }
+
+// Settings
+const char* Loc::Settings_Language() { return LOC("Language", "Jezyk"); }
+const char* Loc::Settings_TabHint() { return LOC("TAB = change tab", "TAB = zmien zakladke"); }

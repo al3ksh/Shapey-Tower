@@ -2,7 +2,7 @@
 #include <string>
 #include "raylib.h"
 struct GameSettings {
-    int configVersion = 3; 
+    int configVersion = 4; 
     int resolutionIndex = 0; 
     bool fullscreen = false;
     bool vsync = true;
@@ -20,6 +20,7 @@ struct GameSettings {
     bool screenShake = true;
     bool particles = true;
     bool comboEffects = true;
+    int language = 0; // 0 = EN, 1 = PL
 };
 
 bool LoadSettings(const std::string &path, GameSettings &out);

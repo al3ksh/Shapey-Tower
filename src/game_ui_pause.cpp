@@ -1,6 +1,7 @@
 #include "game.h"
 #include "raylib.h"
 #include "input.h"
+#include "localization.h"
 #include <cmath>
 
 static int pauseTab = 0;
@@ -94,81 +95,81 @@ void Game::DrawPause(){
     bool click = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
     bool drag = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
     
-    const char* title = "PAUZA";
+    const char* title = Loc::Pause_Title();
     int tw = MeasureText(title, 32);
     DrawText(title, (int)(uiCenterX - tw/2), 18, 32, RAYWHITE);
     
     int tabY = 60;
     int tabW = 70, tabH = 26;
     float tabStartX = uiCenterX - (5 * tabW + 4*3) / 2.f;
-    DrawPauseTabButton(tabStartX, tabY, tabW, tabH, "GRA", 0, mPos, click);
-    DrawPauseTabButton(tabStartX + (tabW+3), tabY, tabW, tabH, "VIDEO", 1, mPos, click);
-    DrawPauseTabButton(tabStartX + 2*(tabW+3), tabY, tabW, tabH, "AUDIO", 2, mPos, click);
-    DrawPauseTabButton(tabStartX + 3*(tabW+3), tabY, tabW, tabH, "KLAWISZE", 3, mPos, click);
-    DrawPauseTabButton(tabStartX + 4*(tabW+3), tabY, tabW, tabH, "EFEKTY", 4, mPos, click);
+    DrawPauseTabButton(tabStartX, tabY, tabW, tabH, Loc::Tab_Game(), 0, mPos, click);
+    DrawPauseTabButton(tabStartX + (tabW+3), tabY, tabW, tabH, Loc::Tab_Video(), 1, mPos, click);
+    DrawPauseTabButton(tabStartX + 2*(tabW+3), tabY, tabW, tabH, Loc::Tab_Audio(), 2, mPos, click);
+    DrawPauseTabButton(tabStartX + 3*(tabW+3), tabY, tabW, tabH, Loc::Tab_Keys(), 3, mPos, click);
+    DrawPauseTabButton(tabStartX + 4*(tabW+3), tabY, tabW, tabH, Loc::Tab_Effects(), 4, mPos, click);
     
     int contentY = tabY + tabH + 18;
     int y = contentY;
     bool settingsChanged = false;
     
     if(pauseTab == 0) {
-        DrawPauseSectionHeader(y, uiCenterX, "Gra");
+        DrawPauseSectionHeader(y, uiCenterX, Loc::Tab_Game());
         y += 6;
         
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, 240, 42, "WZNOW", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 240, 42, Loc::Pause_Resume(), mPos, pressed);
         if(pressed) { state.paused = false; ChangeScreen(GameState::Screen::GAME); }
         y += 10;
         
-        GuiButtonCentered(uiCenterX, y, 240, 38, "RESTART", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 240, 38, Loc::Pause_Restart(), mPos, pressed);
         if(pressed) { ResetGame(); ChangeScreen(GameState::Screen::GAME, false); }
         y += 10;
         
-        GuiButtonCentered(uiCenterX, y, 240, 38, "MENU GLOWNE", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 240, 38, Loc::Pause_MainMenu(), mPos, pressed);
         if(pressed) { ChangeScreen(GameState::Screen::MENU); }
         y += 10;
         
-        GuiButtonCentered(uiCenterX, y, 200, 34, "WYJSCIE", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 200, 34, Loc::Pause_Exit(), mPos, pressed);
         if(pressed) { running = false; }
         
         y += 30;
         char scoreText[64];
-        snprintf(scoreText, sizeof(scoreText), "Wynik: %d", state.score);
+        snprintf(scoreText, sizeof(scoreText), "%s %d", Loc::Pause_Score(), state.score);
         int stw = MeasureText(scoreText, 16);
         DrawText(scoreText, (int)(uiCenterX - stw/2), y, 16, Color{255,220,100,255});
     }
     else if(pauseTab == 1) {
-        DrawPauseSectionHeader(y, uiCenterX, "Video");
+        DrawPauseSectionHeader(y, uiCenterX, Loc::Video_Title());
         y += 6;
         
-        DrawText("Rozdzielczosc:", (int)(uiCenterX - 130), y, 12, Color{180,180,180,255});
+        DrawText(Loc::Video_Resolution(), (int)(uiCenterX - 130), y, 12, Color{180,180,180,255});
         y += 16;
         DrawResolutionSelector(y, uiCenterX, mPos, click, sw);
         y += 6;
         
-        DrawPauseToggle(y, uiCenterX, "Pelny ekran", fullscreen, mPos, click, settingsChanged, sw);
+        DrawPauseToggle(y, uiCenterX, Loc::Video_Fullscreen(), fullscreen, mPos, click, settingsChanged, sw);
         if(settingsChanged) { ApplyResolution(false); settingsChanged = false; settingsDirty = true; }
         
         bool vsyncChanged = false;
-        DrawPauseToggle(y, uiCenterX, "VSync", settings.vsync, mPos, click, vsyncChanged, sw);
+        DrawPauseToggle(y, uiCenterX, Loc::Video_VSync(), settings.vsync, mPos, click, vsyncChanged, sw);
         if(vsyncChanged) {
             if(settings.vsync) SetTargetFPS(GetMonitorRefreshRate(GetCurrentMonitor()));
             else SetTargetFPS(settings.targetFPS);
             settingsDirty = true;
         }
         
-        DrawPauseToggle(y, uiCenterX, "Pokazuj FPS", settings.showFPS, mPos, click, settingsChanged, sw);
+        DrawPauseToggle(y, uiCenterX, Loc::Video_ShowFPS(), settings.showFPS, mPos, click, settingsChanged, sw);
         if(settingsChanged) { settingsDirty = true; settingsChanged = false; }
     }
     else if(pauseTab == 2) {
-        DrawPauseSectionHeader(y, uiCenterX, "Audio");
+        DrawPauseSectionHeader(y, uiCenterX, Loc::Audio_Title());
         y += 6;
         
-        DrawPauseSlider(y, uiCenterX, "Glosnosc glowna", state.audio.masterSlider, mPos, drag, settingsChanged, sw);
-        DrawPauseSlider(y, uiCenterX, "Muzyka", state.audio.volMusic, mPos, drag, settingsChanged, sw);
-        DrawPauseSlider(y, uiCenterX, "Skok", state.audio.volJump, mPos, drag, settingsChanged, sw);
-        DrawPauseSlider(y, uiCenterX, "Odbicie", state.audio.volBounce, mPos, drag, settingsChanged, sw);
-        DrawPauseSlider(y, uiCenterX, "Smierc", state.audio.volDeath, mPos, drag, settingsChanged, sw);
+        DrawPauseSlider(y, uiCenterX, Loc::Audio_Master(), state.audio.masterSlider, mPos, drag, settingsChanged, sw);
+        DrawPauseSlider(y, uiCenterX, Loc::Audio_Music(), state.audio.volMusic, mPos, drag, settingsChanged, sw);
+        DrawPauseSlider(y, uiCenterX, Loc::Audio_Jump(), state.audio.volJump, mPos, drag, settingsChanged, sw);
+        DrawPauseSlider(y, uiCenterX, Loc::Audio_Bounce(), state.audio.volBounce, mPos, drag, settingsChanged, sw);
+        DrawPauseSlider(y, uiCenterX, Loc::Audio_Death(), state.audio.volDeath, mPos, drag, settingsChanged, sw);
         
         if(settingsChanged) {
             settingsDirty = true;
@@ -178,7 +179,7 @@ void Game::DrawPause(){
         
         y += 10;
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, 160, 30, "Domyslne", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 160, 30, Loc::Audio_Default(), mPos, pressed);
         if(pressed) {
             state.audio.masterSlider = 0.5f;
             state.audio.volMusic = 0.5f;
@@ -191,7 +192,7 @@ void Game::DrawPause(){
         }
     }
     else if(pauseTab == 3) {
-        DrawPauseSectionHeader(y, uiCenterX, "Sterowanie");
+        DrawPauseSectionHeader(y, uiCenterX, Loc::Keys_Title());
         y += 6;
         
         pauseBlinkTime += GetFrameTime();
@@ -224,9 +225,9 @@ void Game::DrawPause(){
             y += boxH + 5;
         };
         
-        DrawKeyBind("Ruch w lewo", state.keys.left, PRB_LEFT);
-        DrawKeyBind("Ruch w prawo", state.keys.right, PRB_RIGHT);
-        DrawKeyBind("Skok", state.keys.jump, PRB_JUMP);
+        DrawKeyBind(Loc::Keys_MoveLeft(), state.keys.left, PRB_LEFT);
+        DrawKeyBind(Loc::Keys_MoveRight(), state.keys.right, PRB_RIGHT);
+        DrawKeyBind(Loc::Keys_Jump(), state.keys.jump, PRB_JUMP);
         
         if(pauseRebindActive != PRB_NONE) {
             for(int k = 32; k < 350; k++) {
@@ -239,12 +240,12 @@ void Game::DrawPause(){
                     break;
                 }
             }
-            DrawText("Nacisnij klawisz...", (int)(uiCenterX - 55), y + 5, 13, Color{255,200,100,255});
+            DrawText(Loc::Keys_PressKey(), (int)(uiCenterX - 55), y + 5, 13, Color{255,200,100,255});
         }
         
         y += 20;
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, 160, 30, "Domyslne", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 160, 30, Loc::Keys_Default(), mPos, pressed);
         if(pressed) {
             state.keys.left = KEY_A;
             state.keys.right = KEY_D;
@@ -253,19 +254,19 @@ void Game::DrawPause(){
         }
     }
     else if(pauseTab == 4) {
-        DrawPauseSectionHeader(y, uiCenterX, "Efekty");
+        DrawPauseSectionHeader(y, uiCenterX, Loc::Effects_Title());
         y += 6;
         
         bool shakeChanged = false;
-        DrawPauseToggle(y, uiCenterX, "Trzesienie ekranu", settings.screenShake, mPos, click, shakeChanged, sw);
+        DrawPauseToggle(y, uiCenterX, Loc::Effects_ScreenShake(), settings.screenShake, mPos, click, shakeChanged, sw);
         if(shakeChanged) settingsDirty = true;
         
         bool partChanged = false;
-        DrawPauseToggle(y, uiCenterX, "Czasteczki", settings.particles, mPos, click, partChanged, sw);
+        DrawPauseToggle(y, uiCenterX, Loc::Effects_Particles(), settings.particles, mPos, click, partChanged, sw);
         if(partChanged) settingsDirty = true;
         
         bool comboChanged = false;
-        DrawPauseToggle(y, uiCenterX, "Efekt combo (ogien)", settings.comboEffects, mPos, click, comboChanged, sw);
+        DrawPauseToggle(y, uiCenterX, Loc::Effects_ComboFire(), settings.comboEffects, mPos, click, comboChanged, sw);
         if(comboChanged) settingsDirty = true;
     }
     
@@ -275,7 +276,7 @@ void Game::DrawPause(){
         SetMusicVolume(state.audio.musicBg, state.audio.volMusic * VOL_MUSIC_MULT);
     }
     
-    DrawText("ESC = wznow gre", (int)(uiCenterX - 55), sh - 30, 11, Color{70,70,90,255});
+    DrawText(Loc::Pause_EscResume(), (int)(uiCenterX - 55), sh - 30, 11, Color{70,70,90,255});
     
     if(IsKeyPressed(KEY_TAB)) {
         pauseTab = (pauseTab + 1) % 5;

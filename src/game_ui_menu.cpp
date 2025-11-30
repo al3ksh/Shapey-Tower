@@ -3,6 +3,7 @@
 #include "difficulty.h"
 #include "daily_challenge.h"
 #include "input.h"
+#include "localization.h"
 #include <cmath>
 
 static int menuTab = 0;
@@ -120,26 +121,26 @@ void Game::DrawMenu(){
     const char* title = "SHAPEY TOWER";
     int tw = MeasureText(title, 38);
     DrawText(title, (int)(uiCenterX - tw/2), 20, 38, RAYWHITE);
-    DrawText("v1.0", sw - 45, sh - 22, 12, Color{70,70,70,255});
+    DrawText("v1.5", sw - 45, sh - 22, 12, Color{70,70,70,255});
     
     int tabY = 72;
     int tabW = 80, tabH = 28;
     float tabStartX = uiCenterX - (5 * tabW + 4*3) / 2.f;
-    DrawTabButton(tabStartX, tabY, tabW, tabH, "GRA", 0, mPos, click);
-    DrawTabButton(tabStartX + (tabW+3), tabY, tabW, tabH, "VIDEO", 1, mPos, click);
-    DrawTabButton(tabStartX + 2*(tabW+3), tabY, tabW, tabH, "AUDIO", 2, mPos, click);
-    DrawTabButton(tabStartX + 3*(tabW+3), tabY, tabW, tabH, "KLAWISZE", 3, mPos, click);
-    DrawTabButton(tabStartX + 4*(tabW+3), tabY, tabW, tabH, "EFEKTY", 4, mPos, click);
+    DrawTabButton(tabStartX, tabY, tabW, tabH, Loc::Tab_Game(), 0, mPos, click);
+    DrawTabButton(tabStartX + (tabW+3), tabY, tabW, tabH, Loc::Tab_Video(), 1, mPos, click);
+    DrawTabButton(tabStartX + 2*(tabW+3), tabY, tabW, tabH, Loc::Tab_Audio(), 2, mPos, click);
+    DrawTabButton(tabStartX + 3*(tabW+3), tabY, tabW, tabH, Loc::Tab_Keys(), 3, mPos, click);
+    DrawTabButton(tabStartX + 4*(tabW+3), tabY, tabW, tabH, Loc::Tab_Effects(), 4, mPos, click);
     
     int contentY = tabY + tabH + 20;
     int y = contentY;
     bool settingsChanged = false;
     
     if(menuTab == 0) {
-        DrawSectionHeader(y, uiCenterX, "Rozpocznij gre");
+        DrawSectionHeader(y, uiCenterX, Loc::Menu_StartGame());
         y += 8;
         
-        DrawText("Poziom trudnosci:", (int)(uiCenterX - 140), y, 13, Color{180,180,180,255});
+        DrawText(Loc::Menu_Difficulty(), (int)(uiCenterX - 140), y, 13, Color{180,180,180,255});
         y += 18;
         const char* diffNames[] = {"EASY", "NORMAL", "HARD"};
         int diffInt = (int)state.difficulty;
@@ -150,17 +151,23 @@ void Game::DrawMenu(){
             settingsDirty = true;
         }
         
-        const char* diffDesc[] = {
+        const char* diffDescEN[] = {
+            "Wider platforms, more coins",
+            "Standard settings",
+            "Narrow platforms, faster pace"
+        };
+        const char* diffDescPL[] = {
             "Szersze platformy, wiecej monet",
             "Standardowe ustawienia",
             "Wezsze platformy, szybsze tempo"
         };
-        int ddw = MeasureText(diffDesc[diffInt], 11);
-        DrawText(diffDesc[diffInt], (int)(uiCenterX - ddw/2), y, 11, Color{130,130,150,255});
+        const char* diffDesc = (Loc::GetLanguage() == Language::EN) ? diffDescEN[diffInt] : diffDescPL[diffInt];
+        int ddw = MeasureText(diffDesc, 11);
+        DrawText(diffDesc, (int)(uiCenterX - ddw/2), y, 11, Color{130,130,150,255});
         y += 20;
         
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, 260, 46, "GRAJ", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 260, 46, Loc::Menu_Play(), mPos, pressed);
         if(pressed) {
             state.isDailyRun = false;
             ResetGame();
@@ -170,7 +177,7 @@ void Game::DrawMenu(){
         }
         y += 12;
         
-        GuiButtonCentered(uiCenterX, y, 260, 40, "Daily Challenge", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 260, 40, Loc::Menu_DailyChallenge(), mPos, pressed);
         if(pressed) {
             state.isDailyRun = true;
             state.dailyChallenge = GetTodaysChallenge();
@@ -183,34 +190,34 @@ void Game::DrawMenu(){
         
         DailyChallenge today = GetTodaysChallenge();
         char dateStr[64];
-        snprintf(dateStr, sizeof(dateStr), "Dzis: %04d-%02d-%02d", today.year, today.month, today.day);
+        snprintf(dateStr, sizeof(dateStr), "%s %04d-%02d-%02d", Loc::Menu_Today(), today.year, today.month, today.day);
         int dtw = MeasureText(dateStr, 12);
         DrawText(dateStr, (int)(uiCenterX - dtw/2), y + 8, 12, Color{100,100,120,255});
         y += 35;
         
-        GuiButtonCentered(uiCenterX, y, 180, 36, "WYJSCIE", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 180, 36, Loc::Menu_Exit(), mPos, pressed);
         if(pressed) running = false;
         
         y += 30;
         char hsText[64];
-        snprintf(hsText, sizeof(hsText), "Najlepszy wynik: %d", state.highScore);
+        snprintf(hsText, sizeof(hsText), "%s %d", Loc::Menu_HighScore(), state.highScore);
         int hsw = MeasureText(hsText, 16);
         DrawText(hsText, (int)(uiCenterX - hsw/2), y, 16, Color{255,220,100,255});
     }
     else if(menuTab == 1) {
-        DrawSectionHeader(y, uiCenterX, "Video");
+        DrawSectionHeader(y, uiCenterX, Loc::Video_Title());
         y += 8;
         
-        DrawText("Rozdzielczosc:", (int)(uiCenterX - 140), y, 13, Color{180,180,180,255});
+        DrawText(Loc::Video_Resolution(), (int)(uiCenterX - 140), y, 13, Color{180,180,180,255});
         y += 18;
         DrawResolutionSelector(y, uiCenterX, mPos, click, sw);
         y += 8;
         
-        DrawToggle(y, uiCenterX, "Pelny ekran", fullscreen, mPos, click, settingsChanged, sw);
+        DrawToggle(y, uiCenterX, Loc::Video_Fullscreen(), fullscreen, mPos, click, settingsChanged, sw);
         if(settingsChanged) { ApplyResolution(false); settingsChanged = false; settingsDirty = true; }
         
         bool vsyncChanged = false;
-        DrawToggle(y, uiCenterX, "VSync", settings.vsync, mPos, click, vsyncChanged, sw);
+        DrawToggle(y, uiCenterX, Loc::Video_VSync(), settings.vsync, mPos, click, vsyncChanged, sw);
         if(vsyncChanged) { 
             if(settings.vsync) {
                 SetTargetFPS(GetMonitorRefreshRate(GetCurrentMonitor()));
@@ -221,7 +228,7 @@ void Game::DrawMenu(){
         }
         
         y += 5;
-        DrawText("Limit FPS:", (int)(uiCenterX - 140), y, 13, Color{180,180,180,255});
+        DrawText(Loc::Video_FPSLimit(), (int)(uiCenterX - 140), y, 13, Color{180,180,180,255});
         y += 18;
         const char* fpsOptions[] = {"30", "60", "120", "144", "Max"};
         int fpsValues[] = {30, 60, 120, 144, 0};
@@ -239,19 +246,19 @@ void Game::DrawMenu(){
             settingsDirty = true;
         }
         
-        DrawToggle(y, uiCenterX, "Pokazuj FPS", settings.showFPS, mPos, click, settingsChanged, sw);
+        DrawToggle(y, uiCenterX, Loc::Video_ShowFPS(), settings.showFPS, mPos, click, settingsChanged, sw);
         if(settingsChanged) { settingsDirty = true; settingsChanged = false; }
     }
     else if(menuTab == 2) {
-        DrawSectionHeader(y, uiCenterX, "Audio");
+        DrawSectionHeader(y, uiCenterX, Loc::Audio_Title());
         y += 8;
         
-        DrawSliderRow(y, uiCenterX, "Glosnosc glowna", state.audio.masterSlider, mPos, drag, settingsChanged, sw);
-        DrawSliderRow(y, uiCenterX, "Muzyka", state.audio.volMusic, mPos, drag, settingsChanged, sw);
-        DrawSliderRow(y, uiCenterX, "Skok", state.audio.volJump, mPos, drag, settingsChanged, sw);
-        DrawSliderRow(y, uiCenterX, "Odbicie", state.audio.volBounce, mPos, drag, settingsChanged, sw);
-        DrawSliderRow(y, uiCenterX, "Smierc", state.audio.volDeath, mPos, drag, settingsChanged, sw);
-        DrawSliderRow(y, uiCenterX, "Zmiana tematu", state.audio.volThemeChange, mPos, drag, settingsChanged, sw);
+        DrawSliderRow(y, uiCenterX, Loc::Audio_Master(), state.audio.masterSlider, mPos, drag, settingsChanged, sw);
+        DrawSliderRow(y, uiCenterX, Loc::Audio_Music(), state.audio.volMusic, mPos, drag, settingsChanged, sw);
+        DrawSliderRow(y, uiCenterX, Loc::Audio_Jump(), state.audio.volJump, mPos, drag, settingsChanged, sw);
+        DrawSliderRow(y, uiCenterX, Loc::Audio_Bounce(), state.audio.volBounce, mPos, drag, settingsChanged, sw);
+        DrawSliderRow(y, uiCenterX, Loc::Audio_Death(), state.audio.volDeath, mPos, drag, settingsChanged, sw);
+        DrawSliderRow(y, uiCenterX, Loc::Audio_ThemeChange(), state.audio.volThemeChange, mPos, drag, settingsChanged, sw);
         
         if(settingsChanged) {
             settingsDirty = true;
@@ -261,7 +268,7 @@ void Game::DrawMenu(){
         
         y += 12;
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, 180, 32, "Domyslne", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 180, 32, Loc::Audio_Default(), mPos, pressed);
         if(pressed) {
             state.audio.masterSlider = 0.5f;
             state.audio.volMusic = 0.5f;
@@ -274,7 +281,7 @@ void Game::DrawMenu(){
         }
     }
     else if(menuTab == 3) {
-        DrawSectionHeader(y, uiCenterX, "Sterowanie");
+        DrawSectionHeader(y, uiCenterX, Loc::Keys_Title());
         y += 8;
         
         enum RebindTarget { RB_NONE, RB_LEFT, RB_RIGHT, RB_JUMP };
@@ -310,9 +317,9 @@ void Game::DrawMenu(){
             y += boxH + 6;
         };
         
-        DrawKeyBind("Ruch w lewo", state.keys.left, RB_LEFT);
-        DrawKeyBind("Ruch w prawo", state.keys.right, RB_RIGHT);
-        DrawKeyBind("Skok", state.keys.jump, RB_JUMP);
+        DrawKeyBind(Loc::Keys_MoveLeft(), state.keys.left, RB_LEFT);
+        DrawKeyBind(Loc::Keys_MoveRight(), state.keys.right, RB_RIGHT);
+        DrawKeyBind(Loc::Keys_Jump(), state.keys.jump, RB_JUMP);
         
         if(rebindActive != RB_NONE) {
             for(int k = 32; k < 350; k++) {
@@ -325,12 +332,12 @@ void Game::DrawMenu(){
                     break;
                 }
             }
-            DrawText("Nacisnij klawisz...", (int)(uiCenterX - 60), y + 10, 14, Color{255,200,100,255});
+            DrawText(Loc::Keys_PressKey(), (int)(uiCenterX - 60), y + 10, 14, Color{255,200,100,255});
         }
         
         y += 25;
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, 180, 32, "Domyslne", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 180, 32, Loc::Keys_Default(), mPos, pressed);
         if(pressed) {
             state.keys.left = KEY_A;
             state.keys.right = KEY_D;
@@ -339,24 +346,24 @@ void Game::DrawMenu(){
         }
     }
     else if(menuTab == 4) {
-        DrawSectionHeader(y, uiCenterX, "Efekty");
+        DrawSectionHeader(y, uiCenterX, Loc::Effects_Title());
         y += 8;
         
         bool shakeChanged = false;
-        DrawToggle(y, uiCenterX, "Trzesienie ekranu", settings.screenShake, mPos, click, shakeChanged, sw);
+        DrawToggle(y, uiCenterX, Loc::Effects_ScreenShake(), settings.screenShake, mPos, click, shakeChanged, sw);
         if(shakeChanged) settingsDirty = true;
         
         bool partChanged = false;
-        DrawToggle(y, uiCenterX, "Czasteczki", settings.particles, mPos, click, partChanged, sw);
+        DrawToggle(y, uiCenterX, Loc::Effects_Particles(), settings.particles, mPos, click, partChanged, sw);
         if(partChanged) settingsDirty = true;
         
         bool comboChanged = false;
-        DrawToggle(y, uiCenterX, "Efekt combo (ogien)", settings.comboEffects, mPos, click, comboChanged, sw);
+        DrawToggle(y, uiCenterX, Loc::Effects_ComboFire(), settings.comboEffects, mPos, click, comboChanged, sw);
         if(comboChanged) settingsDirty = true;
         
         y += 25;
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, 180, 32, "Reset wszystkiego", mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, 180, 32, Loc::Effects_ResetAll(), mPos, pressed);
         if(pressed) {
             ResetSettingsToDefaults();
         }
@@ -368,7 +375,78 @@ void Game::DrawMenu(){
         SetMusicVolume(state.audio.musicBg, state.audio.volMusic * VOL_MUSIC_MULT);
     }
     
-    DrawText("TAB = zmien zakladke", (int)(uiCenterX - 70), sh - 35, 11, Color{70,70,90,255});
+    // Language selector box in bottom-right corner
+    {
+        static bool langBoxOpen = false;
+        int boxW = 90, boxH = 26;
+        int boxX = sw - boxW - 10;
+        int boxY = sh - boxH - 45;
+        
+        const char* langLabel = (settings.language == 0) ? "EN" : "PL";
+        Rectangle boxRect{(float)boxX, (float)boxY, (float)boxW, (float)boxH};
+        bool hovered = CheckCollisionPointRec(mPos, boxRect);
+        
+        DrawRectangleRec(boxRect, hovered ? Color{60,70,90,255} : Color{40,50,65,255});
+        DrawRectangleLines(boxX, boxY, boxW, boxH, Color{80,100,130,255});
+        
+        // Globe icon (simple circle with lines)
+        int iconX = boxX + 12;
+        int iconY = boxY + boxH/2;
+        DrawCircleLines(iconX, iconY, 8, Color{150,180,220,255});
+        DrawLine(iconX - 8, iconY, iconX + 8, iconY, Color{150,180,220,255});
+        DrawLine(iconX, iconY - 8, iconX, iconY + 8, Color{150,180,220,255});
+        
+        int ltw = MeasureText(langLabel, 14);
+        DrawText(langLabel, boxX + 30, boxY + 6, 14, RAYWHITE);
+        
+        // Dropdown arrow
+        int arrowX = boxX + boxW - 18;
+        int arrowY = boxY + boxH/2;
+        if(langBoxOpen) {
+            DrawTriangle({(float)(arrowX-5), (float)(arrowY+3)}, {(float)(arrowX+5), (float)(arrowY+3)}, {(float)arrowX, (float)(arrowY-4)}, Color{180,180,180,255});
+        } else {
+            DrawTriangle({(float)(arrowX-5), (float)(arrowY-3)}, {(float)(arrowX+5), (float)(arrowY-3)}, {(float)arrowX, (float)(arrowY+4)}, Color{180,180,180,255});
+        }
+        
+        if(click && hovered) langBoxOpen = !langBoxOpen;
+        
+        // Dropdown options
+        if(langBoxOpen) {
+            int optH = 28;
+            int dropY = boxY - optH * 2 - 4;
+            
+            // English option
+            Rectangle optEN{(float)boxX, (float)dropY, (float)boxW, (float)optH};
+            bool hovEN = CheckCollisionPointRec(mPos, optEN);
+            DrawRectangleRec(optEN, hovEN ? Color{70,90,120,255} : Color{50,60,80,255});
+            DrawRectangleLines(boxX, dropY, boxW, optH, Color{80,100,130,255});
+            DrawText("English", boxX + 10, dropY + 6, 14, settings.language == 0 ? Color{100,200,150,255} : RAYWHITE);
+            if(click && hovEN) {
+                settings.language = 0;
+                Loc::SetLanguage(Language::EN);
+                settingsDirty = true;
+                langBoxOpen = false;
+            }
+            
+            // Polski option
+            Rectangle optPL{(float)boxX, (float)(dropY + optH + 2), (float)boxW, (float)optH};
+            bool hovPL = CheckCollisionPointRec(mPos, optPL);
+            DrawRectangleRec(optPL, hovPL ? Color{70,90,120,255} : Color{50,60,80,255});
+            DrawRectangleLines(boxX, dropY + optH + 2, boxW, optH, Color{80,100,130,255});
+            DrawText("Polski", boxX + 10, dropY + optH + 8, 14, settings.language == 1 ? Color{100,200,150,255} : RAYWHITE);
+            if(click && hovPL) {
+                settings.language = 1;
+                Loc::SetLanguage(Language::PL);
+                settingsDirty = true;
+                langBoxOpen = false;
+            }
+            
+            // Close dropdown if clicked elsewhere
+            if(click && !hovered && !hovEN && !hovPL) langBoxOpen = false;
+        }
+    }
+    
+    DrawText(Loc::Settings_TabHint(), (int)(uiCenterX - 70), sh - 35, 11, Color{70,70,90,255});
     
     if(IsKeyPressed(KEY_TAB)) {
         menuTab = (menuTab + 1) % 5;
