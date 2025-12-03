@@ -2,6 +2,7 @@
 #include "debug.h"
 #include "difficulty.h"
 #include "daily_challenge.h"
+#include "persistence.h"
 #include "input.h"
 #include "localization.h"
 #include <cmath>
@@ -219,12 +220,31 @@ void Game::DrawMenu(){
             state.paused = false;
             ChangeScreen(GameState::Screen::GAME);
         }
+        y += 16;
+        
+        DrawLine((int)(uiCenterX - 130), y, (int)(uiCenterX + 130), y, Color{60,80,120,150});
         y += 12;
         
-        GuiButtonCentered(uiCenterX, y, 260, 40, Loc::Menu_DailyChallenge(), mPos, pressed);
+        DailyChallenge today = state.dailyChallenge;
+        
+        const char* challengeName = GetChallengeName(today.type);
+        char dailyTitle[128];
+        snprintf(dailyTitle, sizeof(dailyTitle), ">> %s <<", challengeName);
+        int ctw = MeasureText(dailyTitle, 16);
+        DrawText(dailyTitle, (int)(uiCenterX - ctw/2), y, 16, Color{255,180,80,255});
+        y += 22;
+        
+        const char* challengeDesc = GetChallengeDescription(today.type);
+        int cdw = MeasureText(challengeDesc, 11);
+        DrawText(challengeDesc, (int)(uiCenterX - cdw/2), y, 11, Color{150,150,170,255});
+        y += 18;
+        
+        GuiButtonCentered(uiCenterX, y, 260, 40, Loc::Daily_Title(), mPos, pressed);
         if(pressed) {
             state.isDailyRun = true;
             state.dailyChallenge = GetTodaysChallenge();
+            state.dailyChallenge.bestScore = LoadDailyHighScore("daily_highscore.txt", 
+                state.dailyChallenge.year, state.dailyChallenge.month, state.dailyChallenge.day);
             state.difficulty = Difficulty::NORMAL;
             ResetGame();
             state.started = true;
@@ -232,17 +252,29 @@ void Game::DrawMenu(){
             ChangeScreen(GameState::Screen::GAME);
         }
         
-        DailyChallenge today = GetTodaysChallenge();
+
         char dateStr[64];
         snprintf(dateStr, sizeof(dateStr), "%s %04d-%02d-%02d", Loc::Menu_Today(), today.year, today.month, today.day);
-        int dtw = MeasureText(dateStr, 12);
-        DrawText(dateStr, (int)(uiCenterX - dtw/2), y + 8, 12, Color{100,100,120,255});
-        y += 35;
+        int dtw = MeasureText(dateStr, 11);
+        DrawText(dateStr, (int)(uiCenterX - dtw/2), y + 6, 11, Color{100,100,120,255});
+        y += 22;
+        
+        if(today.bestScore > 0) {
+            char dailyBest[64];
+            snprintf(dailyBest, sizeof(dailyBest), "%s %d", Loc::Daily_Best(), today.bestScore);
+            int dbw = MeasureText(dailyBest, 13);
+            DrawText(dailyBest, (int)(uiCenterX - dbw/2), y, 13, Color{100,200,255,255});
+            y += 18;
+        }
+        y += 10;
+        
+        DrawLine((int)(uiCenterX - 130), y, (int)(uiCenterX + 130), y, Color{60,80,120,150});
+        y += 18;
         
         GuiButtonCentered(uiCenterX, y, 180, 36, Loc::Menu_Exit(), mPos, pressed);
         if(pressed) running = false;
         
-        y += 30;
+        y += 40;
         char hsText[64];
         snprintf(hsText, sizeof(hsText), "%s %d", Loc::Menu_HighScore(), state.highScore);
         int hsw = MeasureText(hsText, 16);

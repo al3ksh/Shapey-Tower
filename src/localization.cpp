@@ -98,3 +98,31 @@ const char* Loc::GameOver_Exit() { return LOC("Exit", "Wyjscie"); }
 // Settings
 const char* Loc::Settings_Language() { return LOC("Language", "Jezyk"); }
 const char* Loc::Settings_TabHint() { return LOC("TAB = change tab", "TAB = zmien zakladke"); }
+
+// Daily Challenge
+const char* Loc::Daily_Title() { return LOC("Daily Challenge", "Wyzwanie Dnia"); }
+const char* Loc::Daily_Best() { return LOC("Daily Best:", "Rekord dnia:"); }
+
+// Challenge names
+const char* Loc::Daily_Challenge_IceWorld() { return LOC("Ice World", "Lodowy Swiat"); }
+const char* Loc::Daily_Challenge_CrumbleChaos() { return LOC("Crumble Chaos", "Kruchy Chaos"); }
+const char* Loc::Daily_Challenge_SpringMadness() { return LOC("Spring Madness", "Sprezyne Szalenstwo"); }
+const char* Loc::Daily_Challenge_NarrowEscape() { return LOC("Narrow Escape", "Waska Ucieczka"); }
+const char* Loc::Daily_Challenge_DisappearingAct() { return LOC("Disappearing Act", "Znikajacy Akt"); }
+const char* Loc::Daily_Challenge_MovingMayhem() { return LOC("Moving Mayhem", "Ruchomy Chaos"); }
+const char* Loc::Daily_Challenge_NoPowerups() { return LOC("No Power-ups", "Bez Bonusow"); }
+const char* Loc::Daily_Challenge_CoinRush() { return LOC("Coin Rush", "Zlota Goraczka"); }
+const char* Loc::Daily_Challenge_MixedChaos() { return LOC("Mixed Chaos", "Mieszany Chaos"); }
+const char* Loc::Daily_Challenge_SpeedDemon() { return LOC("Speed Demon", "Demon Predkosci"); }
+
+// Challenge descriptions
+const char* Loc::Daily_Desc_IceWorld() { return LOC("All platforms are slippery ice!", "Wszystkie platformy sa sliskim lodem!"); }
+const char* Loc::Daily_Desc_CrumbleChaos() { return LOC("Platforms crumble after you land!", "Platformy krusza sie po ladowaniu!"); }
+const char* Loc::Daily_Desc_SpringMadness() { return LOC("Bounce on springs everywhere!", "Sprezone platformy wszedzie!"); }
+const char* Loc::Daily_Desc_NarrowEscape() { return LOC("Extra narrow platforms!", "Bardzo waskie platformy!"); }
+const char* Loc::Daily_Desc_DisappearingAct() { return LOC("Platforms vanish after landing!", "Platformy znikaja po ladowaniu!"); }
+const char* Loc::Daily_Desc_MovingMayhem() { return LOC("All platforms are moving!", "Wszystkie platformy sie ruszaja!"); }
+const char* Loc::Daily_Desc_NoPowerups() { return LOC("No power-ups, pure skill!", "Bez bonusow, czysta umiejetnosc!"); }
+const char* Loc::Daily_Desc_CoinRush() { return LOC("Extra coins everywhere!", "Dodatkowe monety wszedzie!"); }
+const char* Loc::Daily_Desc_MixedChaos() { return LOC("Random special platforms!", "Losowe specjalne platformy!"); }
+const char* Loc::Daily_Desc_SpeedDemon() { return LOC("Faster scrolling speed!", "Szybsze tempo gry!"); }

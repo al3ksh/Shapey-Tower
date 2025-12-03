@@ -2,6 +2,7 @@
 #include "raylib.h"
 #include "collectibles.h"
 #include "localization.h"
+#include "daily_challenge.h"
 
 #include "debug.h"
 #include "constants.h"
@@ -72,11 +73,10 @@ void Game::DrawGameWorld(float dt){
         DrawRectangleLines((int)state.player.pos.x,(int)state.player.pos.y,(int)state.player.width,(int)state.player.height,{40,40,40,255});
     }
     
-    // Double jump effect - expanding ring
     if(settings.powerUpEffects && state.doubleJumpEffectTimer > 0) {
-        float t = 1.f - (state.doubleJumpEffectTimer / 0.3f); // 0 to 1
-        float radius = 15.f + t * 40.f; // Expanding radius
-        unsigned char alpha = (unsigned char)(200 * (1.f - t)); // Fade out
+        float t = 1.f - (state.doubleJumpEffectTimer / 0.3f); 
+        float radius = 15.f + t * 40.f; 
+        unsigned char alpha = (unsigned char)(200 * (1.f - t)); 
         float cx = state.player.pos.x + state.player.width/2;
         float cy = state.player.pos.y + state.player.height/2;
         DrawCircleLines((int)cx, (int)cy, radius, Color{150, 220, 255, alpha});
@@ -100,6 +100,14 @@ void Game::DrawHud(float dt){
     DrawText(TextFormat("%d", state.totalCoins), cfg.gameWidth - 30, coinY - 10, 20, GOLD);
     
     if(settings.showFPS){ DrawText(TextFormat("FPS: %d", GetFPS()), cfg.gameWidth - 70, coinY + 20, 16, {255,255,255,180}); }
+    
+
+    if(state.isDailyRun) {
+        const char* challengeName = GetChallengeName(state.dailyChallenge.type);
+        int cw = MeasureText(challengeName, 14);
+        DrawRectangle(cfg.gameWidth/2 - cw/2 - 8, 8, cw + 16, 22, Color{60, 40, 100, 200});
+        DrawText(challengeName, cfg.gameWidth/2 - cw/2, 12, 14, Color{255, 180, 80, 255});
+    }
     
     int powerUpY = 70;
     if(state.activeDoubleJump && state.powerUpTimers[0] > 0) {
@@ -131,7 +139,22 @@ void Game::DrawHud(float dt){
 void Game::DrawGameOverOverlay(){
     if(state.currentScreen!=GameState::Screen::GAMEOVER) return;
     for(int y=0;y<cfg.gameHeight;y+=Const::GRADIENT_STEP){ float k=(float)y/cfg.gameHeight; unsigned char a=(unsigned char)(160+60*k); DrawRectangle(0,y,cfg.gameWidth,Const::GRADIENT_STEP,{10,12,20,a}); }
-    int w=Const::GAMEOVER_PANEL_WIDTH; int yTop=Const::GAMEOVER_TOP; int buttons=3,bh=Const::GAMEOVER_BUTTON_H,spacing=Const::GAMEOVER_BUTTON_GAP; int yButtonsTop=yTop+125; int h=(yButtonsTop - yTop)+buttons*bh+(buttons-1)*spacing+20; int x=cfg.gameWidth/2 - w/2; DrawRectangle(x,yTop,w,h,{25,28,42,240}); DrawRectangleLines(x,yTop,w,h,{180,200,255,180}); const char* title=Loc::GameOver_Title(); int tw=MeasureText(title,Const::GAMEOVER_TITLE_FONT); DrawText(title,cfg.gameWidth/2 - tw/2,yTop+15,Const::GAMEOVER_TITLE_FONT,RAYWHITE); const char* scoreTxt=TextFormat("%s %d",Loc::GameOver_Score(),state.score); int sw=MeasureText(scoreTxt,Const::GAMEOVER_SCORE_FONT); DrawText(scoreTxt,cfg.gameWidth/2 - sw/2,yTop+60,Const::GAMEOVER_SCORE_FONT,{255,220,140,255}); const char* bestTxt=TextFormat("%s %d",Loc::GameOver_Best(),state.highScore); int bw=MeasureText(bestTxt,Const::GAMEOVER_BEST_FONT); DrawText(bestTxt,cfg.gameWidth/2 - bw/2,yTop+92,Const::GAMEOVER_BEST_FONT,{200,230,255,255}); int yb=yButtonsTop; Vector2 m=MapWindowToLogical(GetMousePosition()); bool click=IsMouseButtonPressed(MOUSE_LEFT_BUTTON); auto btn=[&](const char* label){ int bw2=260,bh2=Const::GAMEOVER_BUTTON_H; int bx=cfg.gameWidth/2 - bw2/2; Rectangle rc{(float)bx,(float)yb,(float)bw2,(float)bh2}; Color c=CheckCollisionPointRec(m,rc)?Color{90,140,220,255}:Color{60,90,140,255}; DrawRectangleRec(rc,c); DrawRectangleLines(bx,yb,bw2,bh2,RAYWHITE); int ltw=MeasureText(label,20); DrawText(label,bx + bw2/2 - ltw/2,yb+12,20,RAYWHITE); yb+=bh2+Const::GAMEOVER_BUTTON_GAP; return rc; }; Rectangle rRestart=btn(Loc::GameOver_Restart()); if(click && CheckCollisionPointRec(m,rRestart)){ ResetGame(); ChangeScreen(GameState::Screen::GAME,false); } Rectangle rMenu=btn(Loc::GameOver_Menu()); if(click && CheckCollisionPointRec(m,rMenu)){ ChangeScreen(GameState::Screen::MENU,false); } Rectangle rExit=btn(Loc::GameOver_Exit()); if(click && CheckCollisionPointRec(m,rExit)){ running=false; }
+    int w=Const::GAMEOVER_PANEL_WIDTH; int yTop=Const::GAMEOVER_TOP; int buttons=3,bh=Const::GAMEOVER_BUTTON_H,spacing=Const::GAMEOVER_BUTTON_GAP; int yButtonsTop=yTop+125; int h=(yButtonsTop - yTop)+buttons*bh+(buttons-1)*spacing+20; int x=cfg.gameWidth/2 - w/2; DrawRectangle(x,yTop,w,h,{25,28,42,240}); DrawRectangleLines(x,yTop,w,h,{180,200,255,180}); 
+    const char* title=Loc::GameOver_Title(); int tw=MeasureText(title,Const::GAMEOVER_TITLE_FONT); DrawText(title,cfg.gameWidth/2 - tw/2,yTop+15,Const::GAMEOVER_TITLE_FONT,RAYWHITE); 
+    
+    if(state.isDailyRun) {
+        const char* challengeName = GetChallengeName(state.dailyChallenge.type);
+        int cnw = MeasureText(challengeName, 12);
+        DrawText(challengeName, cfg.gameWidth/2 - cnw/2, yTop+42, 12, Color{255, 180, 80, 255});
+    }
+    
+    const char* scoreTxt=TextFormat("%s %d",Loc::GameOver_Score(),state.score); int sw=MeasureText(scoreTxt,Const::GAMEOVER_SCORE_FONT); DrawText(scoreTxt,cfg.gameWidth/2 - sw/2,yTop+60,Const::GAMEOVER_SCORE_FONT,{255,220,140,255}); 
+    
+    int bestScore = state.isDailyRun ? state.dailyChallenge.bestScore : state.highScore;
+    const char* bestLabel = state.isDailyRun ? Loc::Daily_Best() : Loc::GameOver_Best();
+    const char* bestTxt=TextFormat("%s %d", bestLabel, bestScore); int bw=MeasureText(bestTxt,Const::GAMEOVER_BEST_FONT); DrawText(bestTxt,cfg.gameWidth/2 - bw/2,yTop+92,Const::GAMEOVER_BEST_FONT,{200,230,255,255}); 
+    
+    int yb=yButtonsTop; Vector2 m=MapWindowToLogical(GetMousePosition()); bool click=IsMouseButtonPressed(MOUSE_LEFT_BUTTON); auto btn=[&](const char* label){ int bw2=260,bh2=Const::GAMEOVER_BUTTON_H; int bx=cfg.gameWidth/2 - bw2/2; Rectangle rc{(float)bx,(float)yb,(float)bw2,(float)bh2}; Color c=CheckCollisionPointRec(m,rc)?Color{90,140,220,255}:Color{60,90,140,255}; DrawRectangleRec(rc,c); DrawRectangleLines(bx,yb,bw2,bh2,RAYWHITE); int ltw=MeasureText(label,20); DrawText(label,bx + bw2/2 - ltw/2,yb+12,20,RAYWHITE); yb+=bh2+Const::GAMEOVER_BUTTON_GAP; return rc; }; Rectangle rRestart=btn(Loc::GameOver_Restart()); if(click && CheckCollisionPointRec(m,rRestart)){ ResetGame(); ChangeScreen(GameState::Screen::GAME,false); } Rectangle rMenu=btn(Loc::GameOver_Menu()); if(click && CheckCollisionPointRec(m,rMenu)){ ChangeScreen(GameState::Screen::MENU,false); } Rectangle rExit=btn(Loc::GameOver_Exit()); if(click && CheckCollisionPointRec(m,rExit)){ running=false; }
 }
 
 void Game::DrawGame(){
@@ -143,7 +166,6 @@ void Game::DrawGame(){
     DrawGameWorld(dt);
     DrawHud(dt);
     DrawGameOverOverlay();
-    // Shield consumed flash - white overlay
     if(settings.powerUpEffects && state.shieldFlashAlpha > 0) {
         unsigned char a = (unsigned char)(state.shieldFlashAlpha * 200);
         DrawRectangle(0, 0, cfg.gameWidth, cfg.gameHeight, Color{255, 255, 255, a});

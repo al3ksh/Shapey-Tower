@@ -99,4 +99,28 @@ const char* GameOver_Exit();
 const char* Settings_Language();
 const char* Settings_TabHint();
 
+// Daily Challenge
+const char* Daily_Title();
+const char* Daily_Best();
+const char* Daily_Challenge_IceWorld();
+const char* Daily_Challenge_CrumbleChaos();
+const char* Daily_Challenge_SpringMadness();
+const char* Daily_Challenge_NarrowEscape();
+const char* Daily_Challenge_DisappearingAct();
+const char* Daily_Challenge_MovingMayhem();
+const char* Daily_Challenge_NoPowerups();
+const char* Daily_Challenge_CoinRush();
+const char* Daily_Challenge_MixedChaos();
+const char* Daily_Challenge_SpeedDemon();
+const char* Daily_Desc_IceWorld();
+const char* Daily_Desc_CrumbleChaos();
+const char* Daily_Desc_SpringMadness();
+const char* Daily_Desc_NarrowEscape();
+const char* Daily_Desc_DisappearingAct();
+const char* Daily_Desc_MovingMayhem();
+const char* Daily_Desc_NoPowerups();
+const char* Daily_Desc_CoinRush();
+const char* Daily_Desc_MixedChaos();
+const char* Daily_Desc_SpeedDemon();
+
 } // namespace Loc
