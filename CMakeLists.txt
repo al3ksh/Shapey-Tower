@@ -3,15 +3,17 @@ project(ShapeyTower VERSION 1.5.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# raylib discover or fallback
-find_package(raylib QUIET)
-if(NOT raylib_FOUND)
-    message(STATUS "raylib not found - expecting vendor or system install. Define RAYLIB_ROOT if needed.")
-endif()
+# Don't use find_package for raylib - we want to control static vs dynamic linking
+# find_package(raylib QUIET)
 
 file(GLOB SRC_FILES CONFIGURE_DEPENDS src/*.cpp)
 
-add_executable(shapeytower ${SRC_FILES})
+# WIN32 flag makes it a Windows GUI application (no console window)
+if(WIN32)
+    add_executable(shapeytower WIN32 ${SRC_FILES})
+else()
+    add_executable(shapeytower ${SRC_FILES})
+endif()
 
 # Windows embedded icon resource (Explorer/taskbar) - requires shapeyicon.ico
 if(WIN32)
@@ -50,14 +52,51 @@ if(WIN32)
     endif()
 endif()
 
-if(raylib_FOUND)
-    target_link_libraries(shapeytower PRIVATE raylib)
-else()
-    # Fallback manual link (Windows typical) - adjust paths if needed
-    if (WIN32)
-    # Assume raylib is available to the linker (system/vcpkg/MSYS2). Link opengl32 + system libs.
-    target_link_libraries(shapeytower PRIVATE raylib opengl32 winmm gdi32)
+# Link raylib and system libraries
+if (WIN32 AND MINGW)
+    get_filename_component(MINGW_BIN_DIR ${CMAKE_CXX_COMPILER} DIRECTORY)
+    
+    # Find raylib dynamically
+    find_package(raylib QUIET)
+    if(NOT raylib_FOUND)
+        message(WARNING "raylib not found via find_package, trying direct link")
+        target_link_libraries(shapeytower PRIVATE raylib)
+    else()
+        message(STATUS "Found raylib: ${raylib_VERSION}")
+        target_link_libraries(shapeytower PRIVATE raylib)
     endif()
+    
+    # System libraries needed by raylib
+    target_link_libraries(shapeytower PRIVATE opengl32 winmm gdi32)
+    
+    # Hide console + static C++ runtime
+    target_link_options(shapeytower PRIVATE 
+        -mwindows 
+        -static-libgcc 
+        -static-libstdc++
+    )
+    
+    # Copy required DLLs to build directory for distribution
+    set(REQUIRED_DLLS
+        "${MINGW_BIN_DIR}/libraylib.dll"
+        "${MINGW_BIN_DIR}/glfw3.dll"
+        "${MINGW_BIN_DIR}/libwinpthread-1.dll"
+    )
+    
+    foreach(DLL_FILE ${REQUIRED_DLLS})
+        if(EXISTS "${DLL_FILE}")
+            add_custom_command(TARGET shapeytower POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${DLL_FILE}" $<TARGET_FILE_DIR:shapeytower>
+                COMMENT "Copying ${DLL_FILE}"
+            )
+        endif()
+    endforeach()
+elseif(WIN32)
+    target_link_libraries(shapeytower PRIVATE raylib opengl32 winmm gdi32)
+    set_target_properties(shapeytower PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup")
+else()
+    target_link_libraries(shapeytower PRIVATE raylib)
 endif()
 
 target_include_directories(shapeytower PRIVATE include)
@@ -68,6 +107,10 @@ add_custom_command(TARGET shapeytower POST_BUILD
             ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:shapeytower>/assets
     COMMENT "Copy assets/ next to the executable"
 )
+
+# Note: For distribution, these DLLs are required alongside the executable:
+# - libraylib.dll, glfw3.dll, libwinpthread-1.dll
+# The DLLs are automatically copied to the build directory.
 
 # ----- Install rules for packaging / staging -----
 install(TARGETS shapeytower RUNTIME DESTINATION .)

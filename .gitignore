@@ -38,6 +38,10 @@ Thumbs.db
 /build_errors.txt
 /dist
 
+# Installer (local only, not in repo)
+/installer/
+/installer_output/
+
 # Temporary
 .TODO.txt
 todo.txt
