@@ -3,6 +3,7 @@
 #include "collectibles.h"
 #include "localization.h"
 #include "daily_challenge.h"
+#include <cmath>
 
 #include "debug.h"
 #include "constants.h"
@@ -97,9 +98,9 @@ void Game::DrawHud(float dt){
     
     int coinY = (int)(clockY + radius + 15);
     DrawCircle(cfg.gameWidth - 45, coinY, 8, GOLD);
-    DrawText(TextFormat("%d", state.totalCoins), cfg.gameWidth - 30, coinY - 10, 20, GOLD);
+    DrawText(TextFormat("%d", state.globalCoins), cfg.gameWidth - 30, coinY - 10, 20, GOLD);
     
-    if(settings.showFPS){ DrawText(TextFormat("FPS: %d", GetFPS()), cfg.gameWidth - 70, coinY + 20, 16, {255,255,255,180}); }
+    if(settings.showFPS){ DrawText(TextFormat("FPS: %d", GetFPS()), cfg.gameWidth - 70, coinY + 15, 16, {255,255,255,180}); }
     
 
     if(state.isDailyRun) {
@@ -139,7 +140,10 @@ void Game::DrawHud(float dt){
 void Game::DrawGameOverOverlay(){
     if(state.currentScreen!=GameState::Screen::GAMEOVER) return;
     for(int y=0;y<cfg.gameHeight;y+=Const::GRADIENT_STEP){ float k=(float)y/cfg.gameHeight; unsigned char a=(unsigned char)(160+60*k); DrawRectangle(0,y,cfg.gameWidth,Const::GRADIENT_STEP,{10,12,20,a}); }
-    int w=Const::GAMEOVER_PANEL_WIDTH; int yTop=Const::GAMEOVER_TOP; int buttons=3,bh=Const::GAMEOVER_BUTTON_H,spacing=Const::GAMEOVER_BUTTON_GAP; int yButtonsTop=yTop+125; int h=(yButtonsTop - yTop)+buttons*bh+(buttons-1)*spacing+20; int x=cfg.gameWidth/2 - w/2; DrawRectangle(x,yTop,w,h,{25,28,42,240}); DrawRectangleLines(x,yTop,w,h,{180,200,255,180}); 
+    
+    int buttons = 3;
+    
+    int w=Const::GAMEOVER_PANEL_WIDTH; int yTop=Const::GAMEOVER_TOP; int bh=Const::GAMEOVER_BUTTON_H,spacing=Const::GAMEOVER_BUTTON_GAP; int yButtonsTop=yTop+125; int h=(yButtonsTop - yTop)+buttons*bh+(buttons-1)*spacing+20; int x=cfg.gameWidth/2 - w/2; DrawRectangle(x,yTop,w,h,{25,28,42,240}); DrawRectangleLines(x,yTop,w,h,{180,200,255,180}); 
     const char* title=Loc::GameOver_Title(); int tw=MeasureText(title,Const::GAMEOVER_TITLE_FONT); DrawText(title,cfg.gameWidth/2 - tw/2,yTop+15,Const::GAMEOVER_TITLE_FONT,RAYWHITE); 
     
     if(state.isDailyRun) {
@@ -152,9 +156,142 @@ void Game::DrawGameOverOverlay(){
     
     int bestScore = state.isDailyRun ? state.dailyChallenge.bestScore : state.highScore;
     const char* bestLabel = state.isDailyRun ? Loc::Daily_Best() : Loc::GameOver_Best();
-    const char* bestTxt=TextFormat("%s %d", bestLabel, bestScore); int bw=MeasureText(bestTxt,Const::GAMEOVER_BEST_FONT); DrawText(bestTxt,cfg.gameWidth/2 - bw/2,yTop+92,Const::GAMEOVER_BEST_FONT,{200,230,255,255}); 
+    const char* bestTxt=TextFormat("%s %d", bestLabel, bestScore); int bw=MeasureText(bestTxt,Const::GAMEOVER_BEST_FONT); DrawText(bestTxt,cfg.gameWidth/2 - bw/2,yTop+85,Const::GAMEOVER_BEST_FONT,{200,230,255,255}); 
     
-    int yb=yButtonsTop; Vector2 m=MapWindowToLogical(GetMousePosition()); bool click=IsMouseButtonPressed(MOUSE_LEFT_BUTTON); auto btn=[&](const char* label){ int bw2=260,bh2=Const::GAMEOVER_BUTTON_H; int bx=cfg.gameWidth/2 - bw2/2; Rectangle rc{(float)bx,(float)yb,(float)bw2,(float)bh2}; Color c=CheckCollisionPointRec(m,rc)?Color{90,140,220,255}:Color{60,90,140,255}; DrawRectangleRec(rc,c); DrawRectangleLines(bx,yb,bw2,bh2,RAYWHITE); int ltw=MeasureText(label,20); DrawText(label,bx + bw2/2 - ltw/2,yb+12,20,RAYWHITE); yb+=bh2+Const::GAMEOVER_BUTTON_GAP; return rc; }; Rectangle rRestart=btn(Loc::GameOver_Restart()); if(click && CheckCollisionPointRec(m,rRestart)){ ResetGame(); ChangeScreen(GameState::Screen::GAME,false); } Rectangle rMenu=btn(Loc::GameOver_Menu()); if(click && CheckCollisionPointRec(m,rMenu)){ ChangeScreen(GameState::Screen::MENU,false); } Rectangle rExit=btn(Loc::GameOver_Exit()); if(click && CheckCollisionPointRec(m,rExit)){ running=false; }
+    // Show global coins
+    const char* coinsTxt = TextFormat("%s %d", Loc::GameOver_Coins(), state.globalCoins);
+    int cw = MeasureText(coinsTxt, 16);
+    DrawText(coinsTxt, cfg.gameWidth/2 - cw/2, yTop+108, 16, Color{255, 215, 0, 255});
+    
+    int yb=yButtonsTop; Vector2 m=MapWindowToLogical(GetMousePosition()); bool click=IsMouseButtonPressed(MOUSE_LEFT_BUTTON); 
+    
+    auto btn=[&](const char* label, Color baseColor = Color{60,90,140,255}, Color hoverColor = Color{90,140,220,255}){ 
+        int bw2=260,bh2=Const::GAMEOVER_BUTTON_H; int bx=cfg.gameWidth/2 - bw2/2; 
+        Rectangle rc{(float)bx,(float)yb,(float)bw2,(float)bh2}; 
+        Color c=CheckCollisionPointRec(m,rc)?hoverColor:baseColor; 
+        DrawRectangleRec(rc,c); DrawRectangleLines(bx,yb,bw2,bh2,RAYWHITE); 
+        int ltw=MeasureText(label,20); DrawText(label,bx + bw2/2 - ltw/2,yb+12,20,RAYWHITE); 
+        yb+=bh2+Const::GAMEOVER_BUTTON_GAP; return rc; 
+    };
+    
+    Rectangle rRestart=btn(Loc::GameOver_Restart()); if(click && CheckCollisionPointRec(m,rRestart)){ ResetGame(); ChangeScreen(GameState::Screen::GAME,false); } 
+    Rectangle rMenu=btn(Loc::GameOver_Menu()); if(click && CheckCollisionPointRec(m,rMenu)){ ChangeScreen(GameState::Screen::MENU,false); } 
+    Rectangle rExit=btn(Loc::GameOver_Exit()); if(click && CheckCollisionPointRec(m,rExit)){ running=false; }
+}
+
+void Game::DrawRevivePrompt(){
+    EnsureRenderTarget();
+    BeginTextureMode(gameRT);
+    ClearBackground(BLACK);
+    
+    DrawVerticalGradient(cfg.gameWidth, cfg.gameHeight, state.currentTheme.bgTop, state.currentTheme.bgBottom);
+    BeginMode2D(state.camera);
+    for(const auto& pf : state.platforms) {
+        Color c = GetPlatformColor(pf, state.currentTheme.platMoving, state.currentTheme.platStatic);
+        DrawRectangleRec(pf.rect, c);
+    }
+    EndMode2D();
+    
+    DrawRectangle(0, 0, cfg.gameWidth, cfg.gameHeight, Color{0, 0, 0, 180});
+    
+    float timerValue = state.reviveTimer > 0 ? state.reviveTimer : 0;
+    int timerInt = (int)std::ceil(timerValue);
+    
+    int centerX = cfg.gameWidth / 2;
+    int centerY = cfg.gameHeight / 2 - 60;
+    float radius = 80.f;
+    float progress = timerValue / state.REVIVE_TIME_LIMIT;
+    
+    DrawCircle(centerX, centerY, radius + 8, Color{40, 40, 50, 255});
+    DrawCircle(centerX, centerY, radius, Color{20, 25, 35, 255});
+    
+    float startAngle = -90.f;
+    float endAngle = startAngle + (360.f * progress);
+    Color arcColor;
+    if(timerInt <= 2) {
+        arcColor = Color{220, 80, 80, 255}; 
+    } else if(timerInt <= 3) {
+        arcColor = Color{220, 180, 80, 255}; 
+    } else {
+        arcColor = Color{80, 180, 80, 255}; 
+    }
+    DrawCircleSector({(float)centerX, (float)centerY}, radius - 5, startAngle, endAngle, 36, arcColor);
+    
+    DrawCircle(centerX, centerY, radius - 15, Color{30, 35, 45, 255});
+    
+    const char* timerText = TextFormat("%d", timerInt);
+    int timerFontSize = 60;
+    int tw = MeasureText(timerText, timerFontSize);
+    Color timerColor = timerInt <= 2 ? Color{255, 100, 100, 255} : Color{255, 255, 255, 255};
+    DrawText(timerText, centerX - tw/2, centerY - timerFontSize/2 + 5, timerFontSize, timerColor);
+    
+    const char* reviveText = Loc::GameOver_Revive();
+    int reviveFontSize = 28;
+    int rw = MeasureText(reviveText, reviveFontSize);
+    DrawText(reviveText, centerX - rw/2, centerY + radius + 30, reviveFontSize, WHITE);
+    
+    const char* costText = TextFormat("%d", state.reviveCost);
+    int costFontSize = 20;
+    int cw = MeasureText(costText, costFontSize);
+    DrawText(costText, centerX - cw/2, centerY + radius + 65, costFontSize, Color{255, 215, 0, 255});
+    
+    DrawCircle(centerX + cw/2 + 15, centerY + radius + 75, 8, Color{255, 215, 0, 255});
+    
+    Vector2 m = MapWindowToLogical(GetMousePosition());
+    bool click = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+    
+    int btnW = 200, btnH = 50;
+    int btnX = centerX - btnW/2;
+    int btnY = centerY + radius + 100;
+    Rectangle btnRect = {(float)btnX, (float)btnY, (float)btnW, (float)btnH};
+    bool hover = CheckCollisionPointRec(m, btnRect);
+    
+    Color btnColor = hover ? Color{80, 200, 80, 255} : Color{60, 160, 60, 255};
+    DrawRectangleRec(btnRect, btnColor);
+    DrawRectangleLines(btnX, btnY, btnW, btnH, WHITE);
+    
+    const char* btnText = Loc::GameOver_Revive();
+    int btw = MeasureText(btnText, 24);
+    DrawText(btnText, btnX + btnW/2 - btw/2, btnY + 13, 24, WHITE);
+    
+    if(click && hover) {
+        RevivePlayer();
+    }
+    
+    int skipBtnW = 120, skipBtnH = 35;
+    int skipBtnX = centerX - skipBtnW/2;
+    int skipBtnY = btnY + btnH + 20;
+    Rectangle skipRect = {(float)skipBtnX, (float)skipBtnY, (float)skipBtnW, (float)skipBtnH};
+    bool skipHover = CheckCollisionPointRec(m, skipRect);
+    
+    Color skipColor = skipHover ? Color{100, 70, 70, 255} : Color{70, 50, 50, 255};
+    DrawRectangleRec(skipRect, skipColor);
+    DrawRectangleLines(skipBtnX, skipBtnY, skipBtnW, skipBtnH, Color{200, 200, 200, 200});
+    
+    const char* skipText = Loc::GameOver_Cancel();
+    int stw = MeasureText(skipText, 18);
+    DrawText(skipText, skipBtnX + skipBtnW/2 - stw/2, skipBtnY + 9, 18, Color{200, 200, 200, 255});
+    
+    if(click && skipHover) {
+        ChangeScreen(GameState::Screen::GAMEOVER, false);
+    }
+    
+    EndTextureMode();
+    
+    int winW = GetScreenWidth(), winH = GetScreenHeight();
+    float scale = std::fmin((float)winW/cfg.gameWidth, (float)winH/cfg.gameHeight);
+    int drawW = (int)(cfg.gameWidth * scale);
+    int drawH = (int)(cfg.gameHeight * scale);
+    int offX = (winW - drawW) / 2;
+    int offY = (winH - drawH) / 2;
+    viewportRect = {(float)offX, (float)offY, (float)drawW, (float)drawH};
+    
+    BeginDrawing();
+    ClearBackground(BLACK);
+    Rectangle src = {0, 0, (float)gameRT.texture.width, (float)-gameRT.texture.height};
+    Rectangle dst = {(float)offX, (float)offY, (float)drawW, (float)drawH};
+    DrawTexturePro(gameRT.texture, src, dst, {0, 0}, 0.f, WHITE);
+    EndDrawing();
 }
 
 void Game::DrawGame(){

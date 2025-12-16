@@ -92,8 +92,11 @@ const char* Loc::GameOver_Title() { return "GAME OVER"; }
 const char* Loc::GameOver_Score() { return LOC("Score:", "Wynik:"); }
 const char* Loc::GameOver_Best() { return LOC("Best:", "Najlepszy:"); }
 const char* Loc::GameOver_Restart() { return "Restart"; }
+const char* Loc::GameOver_Revive() { return LOC("Revive", "Wskrzes"); }
+const char* Loc::GameOver_Coins() { return LOC("Coins:", "Monety:"); }
 const char* Loc::GameOver_Menu() { return "Menu"; }
 const char* Loc::GameOver_Exit() { return LOC("Exit", "Wyjscie"); }
+const char* Loc::GameOver_Cancel() { return LOC("Cancel", "Anuluj"); }
 
 // Settings
 const char* Loc::Settings_Language() { return LOC("Language", "Jezyk"); }

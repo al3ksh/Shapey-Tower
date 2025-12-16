@@ -69,3 +69,15 @@ void SaveDailyHighScore(const std::string &path, int year, int month, int day, i
         }
     }
 }
+
+int LoadGlobalCoins(const std::string &path) {
+    std::ifstream ifs(path);
+    int v = 0;
+    if (ifs) ifs >> v;
+    return v;
+}
+
+void SaveGlobalCoins(const std::string &path, int value) {
+    std::ofstream ofs(path, std::ios::trunc);
+    if (ofs) ofs << value;
+}

@@ -60,12 +60,14 @@ struct GameState {
     float hardLandingThreshold = 520.f;
     Shader shaderFire{}; int fireLocTime=-1; int fireLocIntensity=-1; int fireLocSpriteSize=-1; int fireLocMode=-1;
     KeyBindings keys;
-    enum class Screen { MENU, GAME, PAUSE, GAMEOVER, DAILY };
+    enum class Screen { MENU, GAME, PAUSE, GAMEOVER, DAILY, REVIVE_PROMPT };
     Screen currentScreen = Screen::MENU;
     float fadeAlpha = 0.f;
     float fadeTarget = 0.f;
     float fadeSpeed = 2.5f;
     bool musicPausedOnDeath = false;
+    float reviveTimer = 5.0f;
+    const float REVIVE_TIME_LIMIT = 5.0f;
     
     std::vector<Coin> coins;
     std::vector<PowerUp> powerups;
@@ -73,6 +75,9 @@ struct GameState {
     int totalCoinsCollected = 0;
     int totalCoins = 0;
     int sessionCoins = 0;
+    int globalCoins = 0;
+    bool hasRevivedThisRun = false;
+    int reviveCost = 10;  
     bool hasDoubleJump = false;
     bool doubleJumpUsed = false;
     bool hasShield = false;
@@ -84,10 +89,8 @@ struct GameState {
     bool activeSlowMotion = false;
     bool activeMagnet = false;
     float powerUpTimers[4] = {0.f, 0.f, 0.f, 0.f};
-    
-    // Visual effects
-    float shieldFlashAlpha = 0.f;      // White flash when shield is consumed
-    float doubleJumpEffectTimer = 0.f; // Ring effect when double jump is used
+    float shieldFlashAlpha = 0.f;      
+    float doubleJumpEffectTimer = 0.f;
     
     Difficulty difficulty = Difficulty::NORMAL;
     DailyChallenge dailyChallenge;
@@ -151,10 +154,12 @@ private:
     void AutoSaveSettings(float dt);
     void ResetSettingsToDefaults();
     void ResetGame();
+    void RevivePlayer();
     void UpdateGameplay(float dt);
     void DrawMenu();
     void DrawPause();
     void DrawGame();
+    void DrawRevivePrompt();
     void UpdateFade(float dt);
     void ChangeScreen(GameState::Screen next, bool withFade=true);
     void EmitLandingParticles(Vector2 contact,int count);

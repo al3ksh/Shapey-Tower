@@ -92,8 +92,11 @@ const char* GameOver_Title();
 const char* GameOver_Score();
 const char* GameOver_Best();
 const char* GameOver_Restart();
+const char* GameOver_Revive();
+const char* GameOver_Coins();
 const char* GameOver_Menu();
 const char* GameOver_Exit();
+const char* GameOver_Cancel();
 
 // Settings
 const char* Settings_Language();

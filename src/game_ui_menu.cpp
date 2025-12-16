@@ -275,6 +275,13 @@ void Game::DrawMenu(){
         if(pressed) running = false;
         
         y += 40;
+        
+        const char* coinsTxt = TextFormat("%s %d", Loc::GameOver_Coins(), state.globalCoins);
+        int coinsTxtW = MeasureText(coinsTxt, 16);
+        DrawCircle((int)(uiCenterX - coinsTxtW/2 - 12), y + 8, 8, GOLD);
+        DrawText(coinsTxt, (int)(uiCenterX - coinsTxtW/2), y, 16, GOLD);
+        y += 24;
+        
         char hsText[64];
         snprintf(hsText, sizeof(hsText), "%s %d", Loc::Menu_HighScore(), state.highScore);
         int hsw = MeasureText(hsText, 16);

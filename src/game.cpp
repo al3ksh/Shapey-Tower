@@ -72,6 +72,7 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
     state.player = Player{ {cfg.gameWidth/2.f-16.f, cfg.gameHeight-120.f},{0,0},32.f,40.f };
     state.platforms.push_back({Rectangle{0,(float)cfg.gameHeight-60.f,(float)cfg.gameWidth,20.f}});
     state.highScore = LoadHighScore("highscore.txt");
+    state.globalCoins = LoadGlobalCoins("coins.txt");
 
     auto spawnPlatform=[&](float y){ float width=80.f+(std::rand()%140); float x=(float)(std::rand()%(int)(cfg.gameWidth-(int)width)); Platform p; p.rect={x,y,width,18.f}; if((std::rand()%100)<state.currentTheme.moveChance){ p.moving=true; p.baseX=x; p.moveAmplitude=40.f+(std::rand()%41); p.moveSpeed=1.f+(std::rand()%200)/100.f; } state.platforms.push_back(p); state.generatedPlatformsCount++; };
     float currentY=state.platforms[0].rect.y-100.f; for(int i=0;i<15;i++){ float gap=state.currentTheme.gapMin+(std::rand()%(int)(state.currentTheme.gapMax-state.currentTheme.gapMin+1)); currentY-=gap; spawnPlatform(currentY);} state.highestPlatformY=currentY;
@@ -222,6 +223,7 @@ void Game::ResetGame(){
     state.score=0; state.comboTimer=0.f; state.comboCount=0; state.lastLandedPlatformIndex=0; state.gameOver=false; state.platforms.clear();
     state.coins.clear(); state.powerups.clear(); state.activePowerUps.clear();
     state.sessionCoins = 0;
+    state.hasRevivedThisRun = false;
     state.hasDoubleJump = false; state.doubleJumpUsed = false; state.hasShield = false;
     state.slowMotionFactor = 1.f; state.coinMagnetRange = 0.f;
     state.activeDoubleJump = false; state.activeShield = false;
@@ -313,6 +315,48 @@ void Game::ResetGame(){
     }
 }
 
+void Game::RevivePlayer(){
+    if(state.globalCoins < state.reviveCost) return;
+    if(state.hasRevivedThisRun) return;
+    
+    state.globalCoins -= state.reviveCost;
+    SaveGlobalCoins("coins.txt", state.globalCoins);
+    state.hasRevivedThisRun = true;
+    state.gameOver = false;
+    
+    float safeY = state.cameraTopY + cfg.gameHeight * 0.3f;
+    const Platform* bestPlatform = nullptr;
+    for(const auto& p : state.platforms) {
+        if(p.rect.y < safeY && p.rect.y > state.cameraTopY - 100) {
+            if(!bestPlatform || p.rect.y > bestPlatform->rect.y) {
+                bestPlatform = &p;
+            }
+        }
+    }
+    
+    if(bestPlatform) {
+        state.player.pos.x = bestPlatform->rect.x + bestPlatform->rect.width/2 - state.player.width/2;
+        state.player.pos.y = bestPlatform->rect.y - state.player.height - 5;
+    } else {
+        state.player.pos.x = cfg.gameWidth/2 - state.player.width/2;
+        state.player.pos.y = state.cameraTopY + cfg.gameHeight * 0.3f;
+    }
+    
+    state.player.vel = {0, 0};
+    
+    state.hasShield = true;
+    state.activeShield = true;
+    state.powerUpTimers[1] = 3.f; 
+    state.activePowerUps.push_back({PowerUpType::SHIELD, 3.f});
+    
+    if(state.musicPausedOnDeath && state.audio.musicBg.ctxData){
+        ResumeMusicStream(state.audio.musicBg);
+        state.musicPausedOnDeath = false;
+    }
+    
+    ChangeScreen(GameState::Screen::GAME, false);
+}
+
 void Game::EmitLandingParticles(Vector2 contact,int count){ 
     if(!settings.particles) return;
     for(int i=0;i<count;i++){ float spd=60.f+(std::rand()%120); float ang=(-90.f+(std::rand()%120)-60.f)*(3.14159f/180.f); Vector2 v{std::cos(ang)*spd,std::sin(ang)*spd}; state.particles.push_back({contact,v,0.6f,0.6f,state.currentTheme.platStatic}); }
@@ -351,6 +395,8 @@ void Game::Update(){
             case GameState::Screen::GAME: ChangeScreen(GameState::Screen::PAUSE); break;
             case GameState::Screen::PAUSE: ChangeScreen(GameState::Screen::GAME); break;
             case GameState::Screen::GAMEOVER: ChangeScreen(GameState::Screen::MENU); break;
+            case GameState::Screen::REVIVE_PROMPT: ChangeScreen(GameState::Screen::GAMEOVER, false); break;
+            default: break;
         }
     }
     float dt=GetFrameTime();
@@ -367,19 +413,29 @@ void Game::Update(){
         case GameState::Screen::GAMEOVER:
             DrawGame();
             break;
+        case GameState::Screen::REVIVE_PROMPT:
+            state.reviveTimer -= dt;
+            if(state.reviveTimer <= 0) {
+                ChangeScreen(GameState::Screen::GAMEOVER, false);
+            }
+            DrawRevivePrompt();
+            break;
+        default: break;
     }
 }
 
 void Game::UpdateGameplay(float dt){
     PROF_SCOPE("UpdateGameplay");
-    if(state.gameOver){ ChangeScreen(GameState::Screen::GAMEOVER,false); }
+    if(state.gameOver && state.currentScreen != GameState::Screen::REVIVE_PROMPT){ 
+        ChangeScreen(GameState::Screen::GAMEOVER,false); 
+    }
     
     float effectiveDt = dt * state.slowMotionFactor;
     
     state.animTime += dt;
     UpdateShake(state.screenShake, dt);
     
-    // Update visual effect timers
+    if(state.shieldFlashAlpha > 0) state.shieldFlashAlpha -= dt * 4.f; 
     if(state.shieldFlashAlpha > 0) state.shieldFlashAlpha -= dt * 4.f; // Fast fade out
     if(state.doubleJumpEffectTimer > 0) state.doubleJumpEffectTimer -= dt;
     
@@ -389,7 +445,6 @@ void Game::UpdateGameplay(float dt){
             if (it->type == PowerUpType::SLOW_MOTION) state.slowMotionFactor = 1.f;
             else if (it->type == PowerUpType::COIN_MAGNET) state.coinMagnetRange = 0.f;
             else if (it->type == PowerUpType::DOUBLE_JUMP) { state.hasDoubleJump = false; state.activeDoubleJump = false; }
-            // Shield is handled by powerUpTimers to ensure death check sees it
             it = state.activePowerUps.erase(it);
         } else ++it;
     }
@@ -505,6 +560,8 @@ void Game::UpdateGameplay(float dt){
             state.sessionCoins++;
             state.totalCoinsCollected++;
             state.totalCoins++;
+            state.globalCoins++;
+            SaveGlobalCoins("coins.txt", state.globalCoins);
             if(settings.particles) {
                 for(int j=0;j<6;j++) {
                     float ang = (float)(std::rand()%360) * 3.14159f/180.f;
@@ -673,7 +730,14 @@ void Game::UpdateGameplay(float dt){
                 state.dailyChallenge.played = true;
             }
             if(state.audio.musicBg.ctxData){ PauseMusicStream(state.audio.musicBg); state.musicPausedOnDeath=true; } 
-            if(state.audio.sndDeath.frameCount>0){ SetSoundVolume(state.audio.sndDeath, state.audio.volDeath * VOL_DEATH_MULT * VOLUME_SCALE); PlaySound(state.audio.sndDeath);} 
+            if(state.audio.sndDeath.frameCount>0){ SetSoundVolume(state.audio.sndDeath, state.audio.volDeath * VOL_DEATH_MULT * VOLUME_SCALE); PlaySound(state.audio.sndDeath);}
+            
+            // Check if player can revive - show revive prompt instead of game over
+            bool canRevive = !state.hasRevivedThisRun && state.globalCoins >= state.reviveCost && !state.isDailyRun;
+            if(canRevive) {
+                state.reviveTimer = state.REVIVE_TIME_LIMIT;
+                ChangeScreen(GameState::Screen::REVIVE_PROMPT, false);
+            }
         } 
     }
 }

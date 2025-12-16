@@ -133,6 +133,13 @@ void Game::DrawPause(){
         if(pressed) { running = false; }
         
         y += 30;
+        
+        const char* coinsTxt = TextFormat("%s %d", Loc::GameOver_Coins(), state.globalCoins);
+        int coinsTxtW = MeasureText(coinsTxt, 14);
+        DrawCircle((int)(uiCenterX - coinsTxtW/2 - 10), y + 7, 6, GOLD);
+        DrawText(coinsTxt, (int)(uiCenterX - coinsTxtW/2), y, 14, GOLD);
+        y += 22;
+        
         char scoreText[64];
         snprintf(scoreText, sizeof(scoreText), "%s %d", Loc::Pause_Score(), state.score);
         int stw = MeasureText(scoreText, 16);
@@ -157,6 +164,39 @@ void Game::DrawPause(){
             else SetTargetFPS(settings.targetFPS);
             settingsDirty = true;
         }
+        
+        y += 4;
+        DrawText(Loc::Video_FPSLimit(), (int)(uiCenterX - 130), y, 12, Color{180,180,180,255});
+        y += 14;
+        const char* fpsOptions[] = {"30", "60", "120", "144", "Max"};
+        int fpsValues[] = {30, 60, 120, 144, 0};
+        int fpsIndex = 1;
+        for(int i = 0; i < 5; i++) {
+            if(fpsValues[i] == settings.targetFPS) { fpsIndex = i; break; }
+        }
+        int boxW = 260, boxH = 26;
+        int boxX = (int)(uiCenterX - boxW/2);
+        if(boxX < 10) boxX = 10;
+        if(boxX + boxW > sw - 10) boxX = sw - 10 - boxW;
+        int btnW = (boxW - 4*3) / 5;
+        for(int i = 0; i < 5; i++) {
+            Rectangle rect{(float)(boxX + i*(btnW+3)), (float)y, (float)btnW, (float)boxH};
+            bool sel = (fpsIndex == i);
+            bool hov = CheckCollisionPointRec(mPos, rect);
+            Color col = sel ? Color{60,140,100,255} : (hov ? Color{60,80,110,255} : Color{45,55,70,255});
+            DrawRectangleRec(rect, col);
+            DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, sel ? Color{100,220,140,255} : Color{80,80,80,255});
+            int ftw = MeasureText(fpsOptions[i], 12);
+            DrawText(fpsOptions[i], (int)(rect.x + rect.width/2 - ftw/2), (int)(rect.y + 7), 12, RAYWHITE);
+            if(click && hov && fpsIndex != i) {
+                settings.targetFPS = fpsValues[i];
+                if(!settings.vsync) {
+                    SetTargetFPS(settings.targetFPS);
+                }
+                settingsDirty = true;
+            }
+        }
+        y += boxH + 6;
         
         DrawPauseToggle(y, uiCenterX, Loc::Video_ShowFPS(), settings.showFPS, mPos, click, settingsChanged, sw);
         if(settingsChanged) { settingsDirty = true; settingsChanged = false; }
