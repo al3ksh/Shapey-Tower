@@ -164,7 +164,7 @@ private:
     void ChangeScreen(GameState::Screen next, bool withFade=true);
     void EmitLandingParticles(Vector2 contact,int count);
     void EmitWallBounceParticles(Vector2 contact,int count);
-    void DrawResolutionSelector(int &y, float uiCenterX, Vector2 mPos, bool click, int sw);
+    void DrawResolutionSelector(int &y, float uiCenterX, Vector2 mPos, bool click, int sw, float scale = 1.0f);
     void DrawAudioSliders(int &y, float uiCenterX, Vector2 mPos, int sw, bool &changedOut);
     void ApplyAudioVolumes();
     template<typename RebindEnum>

@@ -788,21 +788,24 @@ void Game::UpdateFade(float dt){
     else { state.fadeAlpha -= state.fadeSpeed*dt; if(state.fadeAlpha<state.fadeTarget) state.fadeAlpha=state.fadeTarget; }
 }
 
-void Game::DrawResolutionSelector(int &y, float uiCenterX, Vector2 mPos, bool click, int sw){
-    auto clampX=[&](int desired,int w){ int x=desired; if(x<10) x=10; if(x+w>sw-10) x=sw-10-w; return x; };
-    constexpr int rw=300; constexpr int rh=34; int rx=clampX((int)(uiCenterX - rw/2),rw);
+void Game::DrawResolutionSelector(int &y, float uiCenterX, Vector2 mPos, bool click, int sw, float scale){
+    auto S = [scale](int v) { return (int)(v * scale); };
+    auto clampX=[&](int desired,int w){ int x=desired; if(x<S(10)) x=S(10); if(x+w>sw-S(10)) x=sw-S(10)-w; return x; };
+    int rw=S(300); int rh=S(34); int rx=clampX((int)(uiCenterX - rw/2),rw);
     Rectangle resBox{(float)rx,(float)y,(float)rw,(float)rh};
     DrawRectangleRec(resBox,{40,50,70,255}); DrawRectangleLines(rx,y,rw,rh,RAYWHITE);
-    int arrowW=32; Rectangle leftA{(float)(rx+4),(float)(y+4),(float)arrowW,(float)(rh-8)}; Rectangle rightA{(float)(rx+rw-arrowW-4),(float)(y+4),(float)arrowW,(float)(rh-8)};
+    int arrowW=S(32); Rectangle leftA{(float)(rx+S(4)),(float)(y+S(4)),(float)arrowW,(float)(rh-S(8))}; Rectangle rightA{(float)(rx+rw-arrowW-S(4)),(float)(y+S(4)),(float)arrowW,(float)(rh-S(8))};
     auto hover=[&](Rectangle r){ return CheckCollisionPointRec(mPos,r); };
     if(hover(leftA)) DrawRectangleRec(leftA,{70,90,130,255}); else DrawRectangleRec(leftA,{60,80,120,255});
     if(hover(rightA)) DrawRectangleRec(rightA,{70,90,130,255}); else DrawRectangleRec(rightA,{60,80,120,255});
-    DrawText("<", (int)(leftA.x+arrowW/2 - MeasureText("<",20)/2), (int)(leftA.y+6),20,RAYWHITE);
-    DrawText(">", (int)(rightA.x+arrowW/2 - MeasureText(">",20)/2), (int)(rightA.y+6),20,RAYWHITE);
+    int arrowFont = S(20);
+    DrawText("<", (int)(leftA.x+arrowW/2 - MeasureText("<",arrowFont)/2), (int)(leftA.y+S(6)),arrowFont,RAYWHITE);
+    DrawText(">", (int)(rightA.x+arrowW/2 - MeasureText(">",arrowFont)/2), (int)(rightA.y+S(6)),arrowFont,RAYWHITE);
     if(click && hover(leftA)){ if(resolutionIndex>0){ resolutionIndex--; ApplyResolution(); settingsDirty=true; settingsSaveTimer=0.f; } }
     if(click && hover(rightA)){ if(resolutionIndex<RESOLUTION_COUNT-1){ resolutionIndex++; ApplyResolution(); settingsDirty=true; settingsSaveTimer=0.f; } }
-    int cw = kResolutions[resolutionIndex].w; int ch = kResolutions[resolutionIndex].h; std::string resLabel = std::to_string(cw) + "x" + std::to_string(ch); int rtw=MeasureText(resLabel.c_str(),18); DrawText(resLabel.c_str(), rx + rw/2 - rtw/2, y+8, 18, RAYWHITE);
-    y += rh + 10;
+    int labelFont = S(18);
+    int cw = kResolutions[resolutionIndex].w; int ch = kResolutions[resolutionIndex].h; std::string resLabel = std::to_string(cw) + "x" + std::to_string(ch); int rtw=MeasureText(resLabel.c_str(),labelFont); DrawText(resLabel.c_str(), rx + rw/2 - rtw/2, y+S(8), labelFont, RAYWHITE);
+    y += rh + S(10);
 }
 
 void Game::ChangeScreen(GameState::Screen next, bool withFade){
