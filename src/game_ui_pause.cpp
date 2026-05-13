@@ -213,6 +213,8 @@ void Game::DrawPause(){
         DrawPauseSlider(y, uiCenterX, Loc::Audio_Jump(), state.audio.volJump, mPos, drag, settingsChanged, sw);
         DrawPauseSlider(y, uiCenterX, Loc::Audio_Bounce(), state.audio.volBounce, mPos, drag, settingsChanged, sw);
         DrawPauseSlider(y, uiCenterX, Loc::Audio_Death(), state.audio.volDeath, mPos, drag, settingsChanged, sw);
+        DrawPauseSlider(y, uiCenterX, Loc::Audio_Coin(), state.audio.volCoin, mPos, drag, settingsChanged, sw);
+        DrawPauseSlider(y, uiCenterX, Loc::Audio_PowerUp(), state.audio.volPowerUp, mPos, drag, settingsChanged, sw);
         
         if(settingsChanged) {
             settingsDirty = true;
@@ -230,6 +232,8 @@ void Game::DrawPause(){
             state.audio.volBounce = 0.5f;
             state.audio.volDeath = 0.5f;
             state.audio.volThemeChange = 0.5f;
+            state.audio.volCoin = 0.5f;
+            state.audio.volPowerUp = 0.5f;
             ApplyAudioVolumes();
             settingsDirty = true;
         }

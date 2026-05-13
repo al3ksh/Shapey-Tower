@@ -264,6 +264,8 @@ void Game::DrawMenu(){
         Ui::DrawSlider(y, uiCenterX, Loc::Audio_Bounce(), state.audio.volBounce, mPos, drag, settingsChanged, sw, uiScale);
         Ui::DrawSlider(y, uiCenterX, Loc::Audio_Death(), state.audio.volDeath, mPos, drag, settingsChanged, sw, uiScale);
         Ui::DrawSlider(y, uiCenterX, Loc::Audio_ThemeChange(), state.audio.volThemeChange, mPos, drag, settingsChanged, sw, uiScale);
+        Ui::DrawSlider(y, uiCenterX, Loc::Audio_Coin(), state.audio.volCoin, mPos, drag, settingsChanged, sw, uiScale);
+        Ui::DrawSlider(y, uiCenterX, Loc::Audio_PowerUp(), state.audio.volPowerUp, mPos, drag, settingsChanged, sw, uiScale);
         
         if(settingsChanged) {
             settingsDirty = true;
@@ -281,6 +283,8 @@ void Game::DrawMenu(){
             state.audio.volBounce = 0.5f;
             state.audio.volDeath = 0.5f;
             state.audio.volThemeChange = 0.5f;
+            state.audio.volCoin = 0.5f;
+            state.audio.volPowerUp = 0.5f;
             ApplyAudioVolumes();
             settingsDirty = true;
         }

@@ -46,8 +46,10 @@ const char* Loc::Audio_Music() { return LOC("Music", "Muzyka"); }
 const char* Loc::Audio_Jump() { return LOC("Jump", "Skok"); }
 const char* Loc::Audio_Bounce() { return LOC("Bounce", "Odbicie"); }
 const char* Loc::Audio_Death() { return LOC("Death", "Smierc"); }
-const char* Loc::Audio_ThemeChange() { return LOC("Theme Change", "Zmiana tematu"); }
-const char* Loc::Audio_Default() { return LOC("Default", "Domyslne"); }
+    const char* Loc::Audio_ThemeChange() { return LOC("Theme Change", "Zmiana tematu"); }
+    const char* Loc::Audio_Coin() { return LOC("Coin", "Monety"); }
+    const char* Loc::Audio_PowerUp() { return LOC("Power-up", "Power-up"); }
+    const char* Loc::Audio_Default() { return LOC("Default", "Domyslne"); }
 
 // Main Menu - Keys tab
 const char* Loc::Keys_Title() { return LOC("Controls", "Sterowanie"); }

@@ -440,10 +440,10 @@ void Game::Update(){
         case GameState::Screen::PAUSE: DrawPause(); break;
         case GameState::Screen::GAME:
             UpdateGameplay(dt);
-            DrawGame();
+            DrawGame(dt);
             break;
         case GameState::Screen::GAMEOVER:
-            DrawGame();
+            DrawGame(dt);
             break;
         case GameState::Screen::REVIVE_PROMPT:
             state.reviveTimer -= dt;
@@ -480,7 +480,6 @@ void Game::UpdateGameplay(float dt){
         } else ++it;
     }
     
-    if(state.landingTimer>0.f){ state.landingTimer -= dt; if(state.landingTimer<0) state.landingTimer=0; }
     state.lastVerticalVelocity = state.player.vel.y;
     float dir=0.f; if(IsKeyDown(state.keys.left)) dir-=1.f; if(IsKeyDown(state.keys.right)) dir+=1.f;
     bool jumpPressed=IsKeyPressed(state.keys.jump); bool jumpDown=IsKeyDown(state.keys.jump);
@@ -533,7 +532,6 @@ void Game::UpdateGameplay(float dt){
                     } else {
                         EmitLandingParticles({state.player.pos.x+state.player.width/2, topY},6+state.rng.nextInt(6));
                     }
-                    state.landingTimer = 0.f; 
                     if(!state.scrollActive && (int)i>0){ state.scrollActive=true; state.stageTimer=0.f; }
                     if((int)i!=state.lastScoredPlatformIndex){
                         float deltaY=state.lastLandY-pf.rect.y;
@@ -692,7 +690,6 @@ void Game::UpdateGameplay(float dt){
             if(settings.screenShake) TriggerShake(state.screenShake, 10.f, 0.5f);
             if(state.isDailyRun && state.score > state.dailyChallenge.bestScore) {
                 state.dailyChallenge.bestScore = state.score;
-                state.dailyChallenge.played = true;
             }
             if(state.audio.musicBg.ctxData){ PauseMusicStream(state.audio.musicBg); state.musicPausedOnDeath=true; } 
             if(state.audio.sndDeath.frameCount>0){ SetSoundVolume(state.audio.sndDeath, state.audio.volDeath * VOL_DEATH_MULT * VOLUME_SCALE); PlaySound(state.audio.sndDeath);}

@@ -53,7 +53,6 @@ struct GameState {
     float playerSpriteYOffset = 0.f;
     float playerSpriteBottomPad = 0.f;
     float animTime = 0.f;
-    float landingTimer = 0.f;
     bool landingSquashActive = false;
     float landingSquashTime = 0.f;
     float landingSquashDuration = 0.18f;
@@ -160,7 +159,7 @@ private:
     void UpdateGameplay(float dt);
     void DrawMenu();
     void DrawPause();
-    void DrawGame();
+    void DrawGame(float dt);
     void DrawRevivePrompt();
     void UpdateFade(float dt);
     void ChangeScreen(GameState::Screen next, bool withFade=true);

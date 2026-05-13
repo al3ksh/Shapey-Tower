@@ -34,7 +34,6 @@ struct DailyChallenge {
     int year, month, day;
     DailyChallengeType type;
     int bestScore = 0;
-    bool played = false;
 };
 
 inline DailyChallengeType GetChallengeTypeForSeed(unsigned int seed) {

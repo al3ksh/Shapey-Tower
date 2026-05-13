@@ -321,9 +321,8 @@ void Game::DrawRevivePrompt(){
     EndDrawing();
 }
 
-void Game::DrawGame(){
+void Game::DrawGame(float dt){
     PROF_SCOPE("DrawGame");
-    float dt=GetFrameTime();
     if(gameRT.id==0 || gameRT.texture.width!=cfg.gameWidth || gameRT.texture.height!=cfg.gameHeight){ if(gameRT.id>0) UnloadRenderTexture(gameRT); gameRT = LoadRenderTexture(cfg.gameWidth,cfg.gameHeight); }
     BeginTextureMode(gameRT);
     ClearBackground(BLACK);

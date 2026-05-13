@@ -46,8 +46,10 @@ const char* Audio_Music();
 const char* Audio_Jump();
 const char* Audio_Bounce();
 const char* Audio_Death();
-const char* Audio_ThemeChange();
-const char* Audio_Default();
+    const char* Audio_ThemeChange();
+    const char* Audio_Coin();
+    const char* Audio_PowerUp();
+    const char* Audio_Default();
 
 // Main Menu - Keys tab
 const char* Keys_Title();
