@@ -81,3 +81,22 @@ void SaveGlobalCoins(const std::string &path, int value) {
     std::ofstream ofs(path, std::ios::trunc);
     if (ofs) ofs << value;
 }
+
+std::vector<std::string> LoadUnlockedAchievements(const std::string &path) {
+    std::vector<std::string> result;
+    std::ifstream ifs(path);
+    if (!ifs) return result;
+    std::string line;
+    while (std::getline(ifs, line)) {
+        while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' '))
+            line.pop_back();
+        if (!line.empty()) result.push_back(line);
+    }
+    return result;
+}
+
+void SaveUnlockedAchievements(const std::string &path, const std::vector<std::string> &ids) {
+    std::ofstream ofs(path, std::ios::trunc);
+    if (!ofs) return;
+    for (auto &id : ids) ofs << id << "\n";
+}

@@ -102,12 +102,15 @@ void Game::DrawHud(float dt){
     
     if(settings.showFPS){ DrawText(TextFormat("FPS: %d", GetFPS()), cfg.gameWidth - 70, coinY + 15, 16, {255,255,255,180}); }
     
-
     if(state.isDailyRun) {
         const char* challengeName = GetChallengeName(state.dailyChallenge.type);
         int cw = MeasureText(challengeName, 14);
-        DrawRectangle(cfg.gameWidth/2 - cw/2 - 8, 8, cw + 16, 22, Color{60, 40, 100, 200});
-        DrawText(challengeName, cfg.gameWidth/2 - cw/2, 12, 14, Color{255, 180, 80, 255});
+        
+        int y = coinY + (settings.showFPS ? 35 : 15);
+        int x = cfg.gameWidth - cw - 12;
+        
+        DrawRectangle(x - 8, y, cw + 16, 22, Color{60, 40, 100, 200});
+        DrawText(challengeName, x, y + 4, 14, Color{255, 180, 80, 255});
     }
     
     int powerUpY = 70;
@@ -135,6 +138,30 @@ void Game::DrawHud(float dt){
         DrawText("Magnet", 15, powerUpY - 2, 14, WHITE);
     }
     if(state.themeChangeTimer>0){ state.themeChangeTimer-=dt; float alpha=state.themeChangeTimer/3.f; if(alpha<0) alpha=0; if(alpha>1) alpha=1; int a2=(int)(alpha*255); const char* name=state.currentTheme.name; int w=MeasureText(name,Const::HUD_THEME_FONT); DrawText(name,cfg.gameWidth/2-w/2,80,Const::HUD_THEME_FONT,{255,255,255,(unsigned char)a2}); }
+
+    if(state.achievementPopupTimer > 0 && !state.lastUnlockedAchievement.empty()) {
+        float t = state.achievementPopupTimer / 3.f;
+        float slide = 1.f;
+        if(t > 0.85f) slide = (1.f - t) / 0.15f;
+        else if(t < 0.2f) slide = t / 0.2f;
+        if(slide > 1.f) slide = 1.f;
+        if(slide < 0.f) slide = 0.f;
+
+        int popupW = 200, popupH = 36;
+        int popupX = 8;
+        int popupTargetY = cfg.gameHeight - popupH - 10;
+        int popupY = (int)(popupTargetY + (1.f - slide) * 50.f);
+        unsigned char popupAlpha = (unsigned char)(slide * 220);
+
+        DrawRectangle(popupX, popupY, popupW, popupH, {20, 25, 50, popupAlpha});
+        DrawRectangleLines(popupX, popupY, popupW, popupH, {255, 200, 80, popupAlpha});
+
+        int labelFont = 11;
+        DrawText("*", popupX + 6, popupY + 4, labelFont, {255, 200, 80, popupAlpha});
+
+        int nameFont = 14;
+        DrawText(state.lastUnlockedAchievement.c_str(), popupX + 18, popupY + 10, nameFont, {255, 255, 255, popupAlpha});
+    }
 }
 
 void Game::DrawGameOverOverlay(){

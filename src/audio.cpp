@@ -30,6 +30,8 @@ void LoadGameAudio(GameAudio &audio){
     audio.sndBounce = TryLoadSoundMulti("bounce");
     audio.sndDeath = TryLoadSoundMulti("death");
     audio.sndThemeChange = TryLoadSoundMulti("theme-change");
+    audio.sndCoin = TryLoadSoundMulti("coin");
+    audio.sndPowerUp = TryLoadSoundMulti("powerup");
     audio.musicBg = TryLoadMusicMulti("background-music");
 }
 
@@ -38,5 +40,7 @@ void UnloadGameAudio(GameAudio &audio){
     if(audio.sndBounce.frameCount>0) UnloadSound(audio.sndBounce);
     if(audio.sndDeath.frameCount>0) UnloadSound(audio.sndDeath);
     if(audio.sndThemeChange.frameCount>0) UnloadSound(audio.sndThemeChange);
+    if(audio.sndCoin.frameCount>0) UnloadSound(audio.sndCoin);
+    if(audio.sndPowerUp.frameCount>0) UnloadSound(audio.sndPowerUp);
     if(audio.musicBg.ctxData) UnloadMusicStream(audio.musicBg);
 }

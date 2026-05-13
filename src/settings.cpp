@@ -27,6 +27,8 @@ bool LoadSettings(const std::string &path, GameSettings &out){
             else if(k=="bounce") { out.bounce=std::stof(v); parsedMask|=64; }
             else if(k=="death") { out.death=std::stof(v); parsedMask|=128; }
             else if(k=="theme") { out.theme=std::stof(v); parsedMask|=256; }
+            else if(k=="coin") { out.coin=std::stof(v); }
+            else if(k=="powerup") { out.powerup=std::stof(v); }
             else if(k=="keyLeft") { out.keyLeft=std::stoi(v); parsedMask|=512; }
             else if(k=="keyRight") { out.keyRight=std::stoi(v); parsedMask|=1024; }
             else if(k=="keyJump") { out.keyJump=std::stoi(v); parsedMask|=2048; }
@@ -40,7 +42,7 @@ bool LoadSettings(const std::string &path, GameSettings &out){
     }
     // Version left as-is; future migrations can map here. Clamp floats to 0..1.
     auto clamp01=[](float x){ return x<0.f?0.f:(x>1.f?1.f:x); };
-    out.master=clamp01(out.master); out.music=clamp01(out.music); out.jump=clamp01(out.jump); out.bounce=clamp01(out.bounce); out.death=clamp01(out.death); out.theme=clamp01(out.theme);
+    out.master=clamp01(out.master); out.music=clamp01(out.music); out.jump=clamp01(out.jump); out.bounce=clamp01(out.bounce); out.death=clamp01(out.death); out.theme=clamp01(out.theme); out.coin=clamp01(out.coin); out.powerup=clamp01(out.powerup);
     if(out.resolutionIndex<0) out.resolutionIndex=0;
     // Harden key codes: fallback to defaults if outside Raylib range (32..348).
     auto validKey=[](int k){ return k>=32 && k<=348; };
@@ -64,6 +66,8 @@ bool SaveSettings(const std::string &path, const GameSettings &in){
     ofs << "bounce="<< in.bounce <<"\n";
     ofs << "death="<< in.death <<"\n";
     ofs << "theme="<< in.theme <<"\n";
+    ofs << "coin="<< in.coin <<"\n";
+    ofs << "powerup="<< in.powerup <<"\n";
     ofs << "keyLeft="<< in.keyLeft <<"\n";
     ofs << "keyRight="<< in.keyRight <<"\n";
     ofs << "keyJump="<< in.keyJump <<"\n";

@@ -59,6 +59,8 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
     state.audio.volBounce = clamp01(settings.bounce);
     state.audio.volDeath = clamp01(settings.death);
     state.audio.volThemeChange = clamp01(settings.theme);
+    state.audio.volCoin = clamp01(settings.coin);
+    state.audio.volPowerUp = clamp01(settings.powerup);
     state.audio.masterVolume = 0.0001f + state.audio.masterSlider;
     SetMasterVolume(state.audio.masterVolume);
     LoadGameAudio(state.audio);
@@ -122,6 +124,12 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
     }
     state.parallaxLayers = CreateDefaultParallaxLayers();
     state.achievements = CreateAchievements();
+    auto unlockedIds = LoadUnlockedAchievements("achievements.txt");
+    for (auto &id : unlockedIds) {
+        for (auto &ach : state.achievements) {
+            if (ach.id == id) { ach.unlocked = true; break; }
+        }
+    }
     state.dailyChallenge = GetTodaysChallenge();
     state.dailyChallenge.bestScore = LoadDailyHighScore("daily_highscore.txt", 
         state.dailyChallenge.year, state.dailyChallenge.month, state.dailyChallenge.day);
@@ -138,12 +146,22 @@ Game::~Game(){
     settings.bounce = state.audio.volBounce;
     settings.death = state.audio.volDeath;
     settings.theme = state.audio.volThemeChange;
+    settings.coin = state.audio.volCoin;
+    settings.powerup = state.audio.volPowerUp;
     settings.keyLeft = state.keys.left;
     settings.keyRight = state.keys.right;
     settings.keyJump = state.keys.jump;
 
     SaveSettings("settings.cfg", settings);
     SaveHighScore("highscore.txt", state.highScore);
+    
+    {
+        std::vector<std::string> unlocked;
+        for (auto &ach : state.achievements) {
+            if (ach.unlocked) unlocked.push_back(ach.id);
+        }
+        SaveUnlockedAchievements("achievements.txt", unlocked);
+    }
     
     if(state.dailyChallenge.bestScore > 0) {
         SaveDailyHighScore("daily_highscore.txt", 
@@ -435,8 +453,7 @@ void Game::UpdateGameplay(float dt){
     state.animTime += dt;
     UpdateShake(state.screenShake, dt);
     
-    if(state.shieldFlashAlpha > 0) state.shieldFlashAlpha -= dt * 4.f; 
-    if(state.shieldFlashAlpha > 0) state.shieldFlashAlpha -= dt * 4.f; // Fast fade out
+    if(state.shieldFlashAlpha > 0) state.shieldFlashAlpha -= dt * 4.f;
     if(state.doubleJumpEffectTimer > 0) state.doubleJumpEffectTimer -= dt;
     
     for (auto it = state.activePowerUps.begin(); it != state.activePowerUps.end();) {
@@ -562,6 +579,7 @@ void Game::UpdateGameplay(float dt){
             state.totalCoins++;
             state.globalCoins++;
             SaveGlobalCoins("coins.txt", state.globalCoins);
+            if(state.audio.sndCoin.frameCount>0){ SetSoundVolume(state.audio.sndCoin, state.audio.volCoin * VOL_COIN_MULT * VOLUME_SCALE); PlaySound(state.audio.sndCoin); }
             if(settings.particles) {
                 for(int j=0;j<6;j++) {
                     float ang = (float)(std::rand()%360) * 3.14159f/180.f;
@@ -608,6 +626,7 @@ void Game::UpdateGameplay(float dt){
             state.activePowerUps.erase(std::remove_if(state.activePowerUps.begin(), state.activePowerUps.end(),
                 [&pu](const ActivePowerUp& p){ return p.type == pu.type; }), state.activePowerUps.end());
             state.activePowerUps.push_back({pu.type, duration});
+            if(state.audio.sndPowerUp.frameCount>0){ SetSoundVolume(state.audio.sndPowerUp, state.audio.volPowerUp * VOL_POWERUP_MULT * VOLUME_SCALE); PlaySound(state.audio.sndPowerUp); }
             if(settings.screenShake) TriggerShake(state.screenShake, 3.f, 0.1f);
         }
     }
@@ -622,7 +641,7 @@ void Game::UpdateGameplay(float dt){
     if(state.powerUpTimers[3] <= 0) { state.activeMagnet = false; state.coinMagnetRange = 0.f; }
     
     for(auto& ach : state.achievements) {
-        if(!ach.unlocked && ach.condition(state.score, state.comboCount, state.totalCoinsCollected, state.generatedPlatformsCount)) {
+        if(!ach.unlocked && ach.condition(state.score, state.comboCount, state.globalCoins, state.generatedPlatformsCount)) {
             ach.unlocked = true;
             state.lastUnlockedAchievement = ach.name;
             state.achievementPopupTimer = 3.f;
@@ -754,6 +773,8 @@ void Game::AutoSaveSettings(float dt){
         settings.bounce = state.audio.volBounce;
         settings.death = state.audio.volDeath;
         settings.theme = state.audio.volThemeChange;
+        settings.coin = state.audio.volCoin;
+        settings.powerup = state.audio.volPowerUp;
         settings.keyLeft = state.keys.left;
         settings.keyRight = state.keys.right;
         settings.keyJump = state.keys.jump;
@@ -772,6 +793,8 @@ void Game::ResetSettingsToDefaults(){
     state.audio.volBounce = 0.5f;
     state.audio.volDeath = 0.5f;
     state.audio.volThemeChange = 0.5f;
+    state.audio.volCoin = 0.5f;
+    state.audio.volPowerUp = 0.5f;
     state.keys.left = KEY_A;
     state.keys.right = KEY_D;
     state.keys.jump = KEY_SPACE;
