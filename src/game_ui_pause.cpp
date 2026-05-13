@@ -2,6 +2,7 @@
 #include "raylib.h"
 #include "input.h"
 #include "localization.h"
+#include "ui_helpers.h"
 #include <cmath>
 
 static int pauseTab = 0;
@@ -9,19 +10,6 @@ static float uiScale = 1.0f;
 
 static int S(int base) { return (int)(base * uiScale); }
 static float Sf(float base) { return base * uiScale; }
-
-static void DrawPauseTabButton(float x, int y, int w, int h, const char* label, int tabIndex, Vector2 mPos, bool click) {
-    Rectangle rect{x, (float)y, (float)w, (float)h};
-    bool selected = (pauseTab == tabIndex);
-    bool hovered = CheckCollisionPointRec(mPos, rect);
-    Color col = selected ? Color{60,120,180,255} : (hovered ? Color{50,70,100,255} : Color{35,45,60,255});
-    DrawRectangleRec(rect, col);
-    if(selected) DrawRectangle((int)x, y+h-S(3), w, S(3), Color{100,180,255,255});
-    int fontSize = S(13);
-    int tw = MeasureText(label, fontSize);
-    DrawText(label, (int)(x + w/2 - tw/2), y + h/2 - fontSize/2, fontSize, selected ? WHITE : Color{180,180,180,255});
-    if(click && hovered) pauseTab = tabIndex;
-}
 
 static void DrawPauseSectionHeader(int &y, float uiCenterX, const char* text) {
     int fontSize = S(18);
@@ -114,11 +102,11 @@ void Game::DrawPause(){
     int tabW = S(70), tabH = S(26);
     int tabGap = S(3);
     float tabStartX = uiCenterX - (5 * tabW + 4*tabGap) / 2.f;
-    DrawPauseTabButton(tabStartX, tabY, tabW, tabH, Loc::Tab_Game(), 0, mPos, click);
-    DrawPauseTabButton(tabStartX + (tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Video(), 1, mPos, click);
-    DrawPauseTabButton(tabStartX + 2*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Audio(), 2, mPos, click);
-    DrawPauseTabButton(tabStartX + 3*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Keys(), 3, mPos, click);
-    DrawPauseTabButton(tabStartX + 4*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Effects(), 4, mPos, click);
+    if(Ui::DrawTabButton(tabStartX, tabY, tabW, tabH, Loc::Tab_Game(), 0, pauseTab, mPos, click, uiScale)) pauseTab=0;
+    if(Ui::DrawTabButton(tabStartX + (tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Video(), 1, pauseTab, mPos, click, uiScale)) pauseTab=1;
+    if(Ui::DrawTabButton(tabStartX + 2*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Audio(), 2, pauseTab, mPos, click, uiScale)) pauseTab=2;
+    if(Ui::DrawTabButton(tabStartX + 3*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Keys(), 3, pauseTab, mPos, click, uiScale)) pauseTab=3;
+    if(Ui::DrawTabButton(tabStartX + 4*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Effects(), 4, pauseTab, mPos, click, uiScale)) pauseTab=4;
     
     int contentY = tabY + tabH + S(18);
     int y = contentY;
@@ -333,11 +321,7 @@ void Game::DrawPause(){
         if(powerUpChanged) settingsDirty = true;
     }
     
-    state.audio.masterVolume = 0.0001f + state.audio.masterSlider * 1.0f;
-    SetMasterVolume(state.audio.masterVolume);
-    if(state.audio.musicBg.ctxData) {
-        SetMusicVolume(state.audio.musicBg, state.audio.volMusic * VOL_MUSIC_MULT);
-    }
+    ApplyMenuAudioVolumes();
     
     DrawText(Loc::Pause_EscResume(), (int)(uiCenterX - S(55)), sh - S(30), S(11), Color{70,70,90,255});
     

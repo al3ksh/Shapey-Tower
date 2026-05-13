@@ -64,11 +64,6 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
     state.audio.masterVolume = 0.0001f + state.audio.masterSlider;
     SetMasterVolume(state.audio.masterVolume);
     LoadGameAudio(state.audio);
-    if(state.audio.musicBg.ctxData){
-        SetMusicVolume(state.audio.musicBg, state.audio.volMusic);
-        PlayMusicStream(state.audio.musicBg);
-    }
-    std::srand((unsigned)std::time(nullptr));
     state.themes = GetThemes();
     state.currentThemeIndex=0; state.currentTheme=state.themes[0];
     state.player = Player{ {cfg.gameWidth/2.f-16.f, cfg.gameHeight-120.f},{0,0},32.f,40.f };
@@ -76,8 +71,7 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
     state.highScore = LoadHighScore("highscore.txt");
     state.globalCoins = LoadGlobalCoins("coins.txt");
 
-    auto spawnPlatform=[&](float y){ float width=80.f+(std::rand()%140); float x=(float)(std::rand()%(int)(cfg.gameWidth-(int)width)); Platform p; p.rect={x,y,width,18.f}; if((std::rand()%100)<state.currentTheme.moveChance){ p.moving=true; p.baseX=x; p.moveAmplitude=40.f+(std::rand()%41); p.moveSpeed=1.f+(std::rand()%200)/100.f; } state.platforms.push_back(p); state.generatedPlatformsCount++; };
-    float currentY=state.platforms[0].rect.y-100.f; for(int i=0;i<15;i++){ float gap=state.currentTheme.gapMin+(std::rand()%(int)(state.currentTheme.gapMax-state.currentTheme.gapMin+1)); currentY-=gap; spawnPlatform(currentY);} state.highestPlatformY=currentY;
+    float currentY=state.platforms[0].rect.y-100.f; for(int i=0;i<15;i++){ float gap=state.currentTheme.gapMin+state.rng.nextInt((int)(state.currentTheme.gapMax-state.currentTheme.gapMin+1)); currentY-=gap; SpawnOnePlatform(currentY);} state.highestPlatformY=currentY;
     state.camera.target={ (float)cfg.gameWidth/2, state.player.pos.y+state.player.height/2};
     state.camera.offset={ (float)cfg.gameWidth/2,(float)cfg.gameHeight/2};
     state.camera.zoom=1.f;
@@ -228,7 +222,9 @@ bool Game::ShouldClose() const { return !running || WindowShouldClose(); }
 
 void Game::ResetGame(){
     if (state.isDailyRun) {
-        std::srand(state.dailyChallenge.seed);
+        state.rng.seed(state.dailyChallenge.seed);
+    } else {
+        state.rng.seed((unsigned int)std::time(nullptr));
     }
     
     DifficultySettings diffSettings = GetDifficultySettings(state.difficulty);
@@ -255,69 +251,11 @@ void Game::ResetGame(){
     state.player.vel={0,0};
     state.currentThemeIndex=0; state.currentTheme=state.themes[0]; state.themeChangeTimer=2.f; state.generatedPlatformsCount=1; state.lastScoredPlatformIndex=-1; state.lastLandY=state.platforms[0].rect.y;
     
-    auto spawnPlatformLocal=[&](float y){ 
-        float w=80.f+(std::rand()%140) + diffSettings.platformWidthBonus;
-        // Apply daily challenge width modifier
-        if(state.isDailyRun) w *= dailyMods.platformWidthMult;
-        if(w < 50) w = 50;
-        float x=(float)(std::rand()%(int)(cfg.gameWidth-(int)w)); 
-        Platform p; p.rect={x,y,w,18.f}; 
-        
-        // Daily challenge platform type overrides
-        if(state.isDailyRun) {
-            if(dailyMods.allIce) p.type = PlatformType::ICE;
-            else if(dailyMods.allCrumbling) p.type = PlatformType::CRUMBLING;
-            else if(dailyMods.allSpring) p.type = PlatformType::SPRING;
-            else if(dailyMods.allDisappearing) p.type = PlatformType::DISAPPEARING;
-            else {
-                // Normal random roll with extra special chance
-                int typeRoll = std::rand() % 100;
-                int extraChance = dailyMods.specialPlatformChance;
-                if(typeRoll < 5 + extraChance/4) p.type = PlatformType::SPRING;
-                else if(typeRoll < 12 + extraChance/3) p.type = PlatformType::CRUMBLING;
-                else if(typeRoll < 18 + extraChance/3) p.type = PlatformType::ICE;
-                else if(typeRoll < 22 + extraChance/4) p.type = PlatformType::DISAPPEARING;
-            }
-        } else {
-            int typeRoll = std::rand() % 100;
-            if(typeRoll < 5) p.type = PlatformType::SPRING;
-            else if(typeRoll < 12) p.type = PlatformType::CRUMBLING;
-            else if(typeRoll < 18) p.type = PlatformType::ICE;
-            else if(typeRoll < 22) p.type = PlatformType::DISAPPEARING;
-        }
-        
-        if(state.isDailyRun && dailyMods.allMoving) {
-            p.moving = true;
-            p.baseX = x;
-            p.moveAmplitude = 40.f + (std::rand() % 60);
-            p.moveSpeed = 1.2f + (std::rand() % 200) / 100.f;
-        } else if((std::rand()%100)<25) {
-            p.moving=true; p.baseX=x; p.moveAmplitude=40.f+(std::rand()%41); p.moveSpeed=1.f+(std::rand()%200)/100.f;
-        }
-        state.platforms.push_back(p);
-        
-        int coinChance = diffSettings.coinSpawnChance;
-        if(state.isDailyRun && dailyMods.extraCoins) coinChance = 60; // Higher coin spawn
-        if((std::rand()%100) < coinChance) {
-            Coin coin; coin.pos = {x + w/2, y - 30}; state.coins.push_back(coin);
-
-            if(state.isDailyRun && dailyMods.extraCoins && (std::rand()%100) < 40) {
-                Coin coin2; coin2.pos = {x + w/2 + 25, y - 30}; state.coins.push_back(coin2);
-            }
-        }
-        
-        if(!(state.isDailyRun && dailyMods.noPowerUps)) {
-            if((std::rand()%100) < diffSettings.powerUpSpawnChance) {
-                PowerUp pu; pu.pos = {x + w/2, y - 50}; pu.type = (PowerUpType)(std::rand() % 4); state.powerups.push_back(pu);
-            }
-        }
-    };
-    
     float gapMult = diffSettings.gapMultiplier;
     float currentY2=state.platforms[0].rect.y-100.f; 
     for(int i=0;i<15;i++){ 
-        float gap=(state.currentTheme.gapMin+(std::rand()%(int)(state.currentTheme.gapMax-state.currentTheme.gapMin+1))) * gapMult; 
-        currentY2-=gap; spawnPlatformLocal(currentY2); state.generatedPlatformsCount++; 
+        float gap=(state.currentTheme.gapMin+state.rng.nextInt((int)(state.currentTheme.gapMax-state.currentTheme.gapMin+1))) * gapMult; 
+        currentY2-=gap; SpawnOnePlatform(currentY2);
     }
     state.highestPlatformY=currentY2; state.cameraTopY=state.player.pos.y+state.player.height/2; state.scrollActive=false; state.speedStage=0; state.stageTimer=0.f; 
     
@@ -377,21 +315,97 @@ void Game::RevivePlayer(){
 
 void Game::EmitLandingParticles(Vector2 contact,int count){ 
     if(!settings.particles) return;
-    for(int i=0;i<count;i++){ float spd=60.f+(std::rand()%120); float ang=(-90.f+(std::rand()%120)-60.f)*(3.14159f/180.f); Vector2 v{std::cos(ang)*spd,std::sin(ang)*spd}; state.particles.push_back({contact,v,0.6f,0.6f,state.currentTheme.platStatic}); }
+    for(int i=0;i<count;i++){ float spd=60.f+state.rng.nextInt(120); float ang=(-90.f+state.rng.nextInt(120)-60.f)*(3.14159f/180.f); Vector2 v{std::cos(ang)*spd,std::sin(ang)*spd}; state.particles.push_back({contact,v,0.6f,0.6f,state.currentTheme.platStatic}); }
 }
 void Game::EmitWallBounceParticles(Vector2 contact,int count){
     if(!settings.particles) return;
     bool left = (contact.x < state.player.width*0.5f + 2.f);
     bool right = !left;
     for(int i=0;i<count;i++){
-        float spd = 120.f + (std::rand()%160);
+        float spd = 120.f + state.rng.nextInt(160);
         float deg;
-        if(left){ deg = -60.f + (std::rand()%120); }
-        else { deg = 120.f + (std::rand()%120); }
+        if(left){ deg = -60.f + state.rng.nextInt(120); }
+        else { deg = 120.f + state.rng.nextInt(120); }
         float ang = deg * (3.1415926f/180.f);
     Vector2 v{std::cos(ang)*spd, std::sin(ang)*spd};
         Color c = (i%2==0)? state.currentTheme.platStatic : state.currentTheme.playerBody;
         state.particles.push_back({contact,v,0.55f,0.55f,c});
+    }
+}
+
+void Game::ApplyThemeIfNeeded(){
+    int stage = state.generatedPlatformsCount / PLATFORMS_PER_THEME;
+    int nextTheme = stage % (int)state.themes.size();
+    if(nextTheme != state.currentThemeIndex){
+        state.currentThemeIndex = nextTheme;
+        state.currentTheme = state.themes[state.currentThemeIndex];
+        state.themeChangeTimer = 3.f;
+        if(state.audio.sndThemeChange.frameCount>0){
+            SetSoundVolume(state.audio.sndThemeChange, state.audio.volThemeChange * VOL_THEME_MULT * VOLUME_SCALE);
+            PlaySound(state.audio.sndThemeChange);
+        }
+    }
+}
+
+void Game::SpawnOnePlatform(float y){
+    DifficultySettings diffSettings = GetDifficultySettings(state.difficulty);
+    DailyChallengeModifiers dailyMods;
+    if(state.isDailyRun) dailyMods = GetChallengeModifiers(state.dailyChallenge.type);
+
+    float w = 80.f + state.rng.nextInt(140) + diffSettings.platformWidthBonus;
+    if(state.isDailyRun) w *= dailyMods.platformWidthMult;
+    if(w < 50) w = 50;
+    float x = (float)(state.rng.nextInt((int)(cfg.gameWidth - (int)w)));
+    Platform p; p.rect = {x, y, w, 18.f};
+
+    if(state.isDailyRun){
+        if(dailyMods.allIce) p.type = PlatformType::ICE;
+        else if(dailyMods.allCrumbling) p.type = PlatformType::CRUMBLING;
+        else if(dailyMods.allSpring) p.type = PlatformType::SPRING;
+        else if(dailyMods.allDisappearing) p.type = PlatformType::DISAPPEARING;
+        else {
+            int typeRoll = state.rng.nextPercent();
+            int extraChance = dailyMods.specialPlatformChance;
+            if(typeRoll < 5 + extraChance/4) p.type = PlatformType::SPRING;
+            else if(typeRoll < 12 + extraChance/3) p.type = PlatformType::CRUMBLING;
+            else if(typeRoll < 18 + extraChance/3) p.type = PlatformType::ICE;
+            else if(typeRoll < 22 + extraChance/4) p.type = PlatformType::DISAPPEARING;
+        }
+    } else {
+        int typeRoll = state.rng.nextPercent();
+        if(typeRoll < 5) p.type = PlatformType::SPRING;
+        else if(typeRoll < 12) p.type = PlatformType::CRUMBLING;
+        else if(typeRoll < 18) p.type = PlatformType::ICE;
+        else if(typeRoll < 22) p.type = PlatformType::DISAPPEARING;
+    }
+
+    if(state.isDailyRun && dailyMods.allMoving){
+        p.moving = true;
+        p.baseX = x;
+        p.moveAmplitude = 40.f + state.rng.nextInt(60);
+        p.moveSpeed = 1.2f + state.rng.nextFloat(0.f, 2.f);
+    } else if(state.rng.nextPercent() < state.currentTheme.moveChance){
+        p.moving = true; p.baseX = x;
+        p.moveAmplitude = 40.f + state.rng.nextInt(41);
+        p.moveSpeed = 1.f + state.rng.nextFloat(0.f, 2.f);
+    }
+    state.platforms.push_back(p);
+    state.generatedPlatformsCount++;
+    ApplyThemeIfNeeded();
+
+    int coinChance = diffSettings.coinSpawnChance;
+    if(state.isDailyRun && dailyMods.extraCoins) coinChance = 60;
+    if(state.rng.nextPercent() < coinChance){
+        Coin coin; coin.pos = {x + w/2, y - 30}; state.coins.push_back(coin);
+        if(state.isDailyRun && dailyMods.extraCoins && state.rng.nextPercent() < 40){
+            Coin coin2; coin2.pos = {x + w/2 + 25, y - 30}; state.coins.push_back(coin2);
+        }
+    }
+
+    if(!(state.isDailyRun && dailyMods.noPowerUps)){
+        if(state.rng.nextPercent() < diffSettings.powerUpSpawnChance){
+            PowerUp pu; pu.pos = {x + w/2, y - 50}; pu.type = (PowerUpType)(state.rng.nextInt(4)); state.powerups.push_back(pu);
+        }
     }
 }
 
@@ -514,10 +528,10 @@ void Game::UpdateGameplay(float dt){
                     if(impactSpeed >= state.hardLandingThreshold){
                         state.landingSquashActive = true;
                         state.landingSquashTime = 0.f;
-                        EmitLandingParticles({state.player.pos.x+state.player.width/2, topY},14+std::rand()%8);
+                        EmitLandingParticles({state.player.pos.x+state.player.width/2, topY},14+state.rng.nextInt(8));
                         if(settings.screenShake) TriggerShake(state.screenShake, 3.f, 0.1f);
                     } else {
-                        EmitLandingParticles({state.player.pos.x+state.player.width/2, topY},6+std::rand()%6);
+                        EmitLandingParticles({state.player.pos.x+state.player.width/2, topY},6+state.rng.nextInt(6));
                     }
                     state.landingTimer = 0.f; 
                     if(!state.scrollActive && (int)i>0){ state.scrollActive=true; state.stageTimer=0.f; }
@@ -582,8 +596,8 @@ void Game::UpdateGameplay(float dt){
             if(state.audio.sndCoin.frameCount>0){ SetSoundVolume(state.audio.sndCoin, state.audio.volCoin * VOL_COIN_MULT * VOLUME_SCALE); PlaySound(state.audio.sndCoin); }
             if(settings.particles) {
                 for(int j=0;j<6;j++) {
-                    float ang = (float)(std::rand()%360) * 3.14159f/180.f;
-                    float spd = 80.f + std::rand()%60;
+                    float ang = (float)state.rng.nextInt(360) * 3.14159f/180.f;
+                    float spd = 80.f + state.rng.nextInt(60);
                     state.particles.push_back({{coin.pos.x, coin.pos.y}, {std::cos(ang)*spd, std::sin(ang)*spd}, 0.4f, 0.4f, {255,215,0,255}});
                 }
             }
@@ -650,77 +664,9 @@ void Game::UpdateGameplay(float dt){
     if(state.achievementPopupTimer > 0) state.achievementPopupTimer -= dt;
 
     DifficultySettings diffSettings = GetDifficultySettings(state.difficulty);
-    
-    // Get daily challenge modifiers for platform generation
-    DailyChallengeModifiers dailyMods;
-    if (state.isDailyRun) {
-        dailyMods = GetChallengeModifiers(state.dailyChallenge.type);
-    }
-    
-    auto applyThemeIfNeeded=[&](){ int stage=state.generatedPlatformsCount/PLATFORMS_PER_THEME; int nextTheme=stage%(int)state.themes.size(); if(nextTheme!=state.currentThemeIndex){ state.currentThemeIndex=nextTheme; state.currentTheme=state.themes[state.currentThemeIndex]; state.themeChangeTimer=3.f; if(state.audio.sndThemeChange.frameCount>0){ SetSoundVolume(state.audio.sndThemeChange, state.audio.volThemeChange * VOL_THEME_MULT * VOLUME_SCALE); PlaySound(state.audio.sndThemeChange);} } };
-    auto spawnPlatform=[&](float y){ 
-        float width=80.f+(std::rand()%140) + diffSettings.platformWidthBonus;
-        if(state.isDailyRun) width *= dailyMods.platformWidthMult;
-        if(width < 50) width = 50;
-        float x=(float)(std::rand()%(int)(cfg.gameWidth-(int)width)); 
-        Platform p; p.rect={x,y,width,18.f}; 
-        
-        // Daily challenge platform type overrides
-        if(state.isDailyRun) {
-            if(dailyMods.allIce) p.type = PlatformType::ICE;
-            else if(dailyMods.allCrumbling) p.type = PlatformType::CRUMBLING;
-            else if(dailyMods.allSpring) p.type = PlatformType::SPRING;
-            else if(dailyMods.allDisappearing) p.type = PlatformType::DISAPPEARING;
-            else {
-                int typeRoll = std::rand() % 100;
-                int extraChance = dailyMods.specialPlatformChance;
-                if(typeRoll < 5 + extraChance/4) p.type = PlatformType::SPRING;
-                else if(typeRoll < 12 + extraChance/3) p.type = PlatformType::CRUMBLING;
-                else if(typeRoll < 18 + extraChance/3) p.type = PlatformType::ICE;
-                else if(typeRoll < 22 + extraChance/4) p.type = PlatformType::DISAPPEARING;
-            }
-        } else {
-            int typeRoll = std::rand() % 100;
-            if(typeRoll < 5) p.type = PlatformType::SPRING;
-            else if(typeRoll < 12) p.type = PlatformType::CRUMBLING;
-            else if(typeRoll < 18) p.type = PlatformType::ICE;
-            else if(typeRoll < 22) p.type = PlatformType::DISAPPEARING;
-        }
-        
-        // Daily challenge moving platform override
-        if(state.isDailyRun && dailyMods.allMoving) {
-            p.moving = true;
-            p.baseX = x;
-            p.moveAmplitude = 40.f + (std::rand() % 60);
-            p.moveSpeed = 1.2f + (std::rand() % 200) / 100.f;
-        } else if((std::rand()%100)<state.currentTheme.moveChance) {
-            p.moving=true; p.baseX=x; p.moveAmplitude=40.f+(std::rand()%41); p.moveSpeed=1.f+(std::rand()%200)/100.f;
-        }
-        state.platforms.push_back(p); 
-        state.generatedPlatformsCount++; 
-        applyThemeIfNeeded();
-        
-        // Coins - extra for COIN_RUSH challenge
-        int coinChance = diffSettings.coinSpawnChance;
-        if(state.isDailyRun && dailyMods.extraCoins) coinChance = 60;
-        if((std::rand()%100) < coinChance) {
-            Coin coin; coin.pos = {x + width/2, y - 30}; state.coins.push_back(coin);
-            if(state.isDailyRun && dailyMods.extraCoins && (std::rand()%100) < 40) {
-                Coin coin2; coin2.pos = {x + width/2 + 25, y - 30}; state.coins.push_back(coin2);
-            }
-        }
-        
-        // Power-ups (disabled for NO_POWERUPS challenge)
-        if(!(state.isDailyRun && dailyMods.noPowerUps)) {
-            if((std::rand()%100) < diffSettings.powerUpSpawnChance) {
-                PowerUp pu; pu.pos = {x + width/2, y - 50}; pu.type = (PowerUpType)(std::rand() % 4); state.powerups.push_back(pu);
-            }
-        }
-    };
-
     float gapMult = diffSettings.gapMultiplier;
     float genThreshold=state.cameraTopY - 800.f;
-    while(state.highestPlatformY>genThreshold){ float dynamicMax=state.currentTheme.gapMax - state.speedStage*5.f - (state.scrollActive?10.f:0.f); if(dynamicMax<state.currentTheme.gapMin+5.f) dynamicMax=state.currentTheme.gapMin+5.f; float gap=(state.currentTheme.gapMin + (std::rand()%(int)(dynamicMax-state.currentTheme.gapMin+1))) * gapMult; state.highestPlatformY -= gap; spawnPlatform(state.highestPlatformY);} 
+    while(state.highestPlatformY>genThreshold){ float dynamicMax=state.currentTheme.gapMax - state.speedStage*5.f - (state.scrollActive?10.f:0.f); if(dynamicMax<state.currentTheme.gapMin+5.f) dynamicMax=state.currentTheme.gapMin+5.f; float gap=(state.currentTheme.gapMin + state.rng.nextInt((int)(dynamicMax-state.currentTheme.gapMin+1))) * gapMult; state.highestPlatformY -= gap; SpawnOnePlatform(state.highestPlatformY);} 
 
     float desiredY=state.player.pos.y+state.player.height/2; if(desiredY < state.cameraTopY - cfg.deadzone) state.cameraTopY = desiredY + cfg.deadzone; if(state.scrollActive){ state.stageTimer += dt; if(state.speedStage<5 && state.stageTimer>=cfg.STAGE_DURATION){ state.stageTimer-=cfg.STAGE_DURATION; state.speedStage++; if(state.speedStage<5) state.scrollSpeed*=1.25f; } state.cameraTopY -= state.scrollSpeed*dt; float topLimit=state.player.pos.y+state.player.height/2+cfg.deadzone; if(state.cameraTopY > topLimit) state.cameraTopY = topLimit; }
     state.camera.target={(float)cfg.gameWidth/2 + state.screenShake.offset.x, state.cameraTopY + state.screenShake.offset.y};
@@ -857,6 +803,14 @@ void Game::ApplyAudioVolumes(){
     state.audio.masterVolume = 0.0001f + state.audio.masterSlider;
     SetMasterVolume(state.audio.masterVolume);
     if(state.audio.musicBg.ctxData){ SetMusicVolume(state.audio.musicBg, state.audio.volMusic * VOL_MUSIC_MULT); }
+}
+
+void Game::ApplyMenuAudioVolumes(){
+    state.audio.masterVolume = 0.0001f + state.audio.masterSlider * 1.0f;
+    SetMasterVolume(state.audio.masterVolume);
+    if(state.audio.musicBg.ctxData) {
+        SetMusicVolume(state.audio.musicBg, state.audio.volMusic * VOL_MUSIC_MULT);
+    }
 }
 
 void Game::DrawAudioSliders(int &y, float uiCenterX, Vector2 mPos, int sw, bool &changedOut){

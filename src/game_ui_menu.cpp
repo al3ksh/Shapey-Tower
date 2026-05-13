@@ -5,6 +5,7 @@
 #include "persistence.h"
 #include "input.h"
 #include "localization.h"
+#include "ui_helpers.h"
 #include <cmath>
 
 static int menuTab = 0;
@@ -13,92 +14,11 @@ static float uiScale = 1.0f;
 static int S(int base) { return (int)(base * uiScale); }
 static float Sf(float base) { return base * uiScale; }
 
-static void DrawTabButton(float x, int y, int w, int h, const char* label, int tabIndex, Vector2 mPos, bool click) {
-    Rectangle rect{x, (float)y, (float)w, (float)h};
-    bool selected = (menuTab == tabIndex);
-    bool hovered = CheckCollisionPointRec(mPos, rect);
-    Color col = selected ? Color{60,120,180,255} : (hovered ? Color{50,70,100,255} : Color{35,45,60,255});
-    DrawRectangleRec(rect, col);
-    if(selected) DrawRectangle((int)x, y+h-S(3), w, S(3), Color{100,180,255,255});
-    int fontSize = S(14);
-    int tw = MeasureText(label, fontSize);
-    DrawText(label, (int)(x + w/2 - tw/2), y + h/2 - fontSize/2, fontSize, selected ? WHITE : Color{180,180,180,255});
-    if(click && hovered) menuTab = tabIndex;
-}
-
-static void DrawSectionHeader(int &y, float uiCenterX, const char* text) {
-    int fontSize = S(20);
-    int tw = MeasureText(text, fontSize);
-    DrawText(text, (int)(uiCenterX - tw/2), y, fontSize, Color{100,180,255,255});
-    y += S(28);
-    DrawLine((int)(uiCenterX - S(100)), y-S(5), (int)(uiCenterX + S(100)), y-S(5), Color{60,80,120,180});
-}
-
-static void DrawToggle(int &y, float uiCenterX, const char* label, bool &value, Vector2 mPos, bool click, bool &changed, int sw) {
-    int boxW = S(280), boxH = S(32);
-    int boxX = (int)(uiCenterX - boxW/2);
-    if(boxX < S(10)) boxX = S(10);
-    if(boxX + boxW > sw - S(10)) boxX = sw - S(10) - boxW;
-    
-    Rectangle rect{(float)boxX, (float)y, (float)boxW, (float)boxH};
-    bool hovered = CheckCollisionPointRec(mPos, rect);
-    DrawRectangleRec(rect, hovered ? Color{50,60,80,255} : Color{40,50,65,255});
-    DrawText(label, boxX + S(12), y + S(8), S(15), RAYWHITE);
-    
-    int toggleX = boxX + boxW - S(55);
-    int toggleY = y + S(7);
-    int toggleW = S(44), toggleH = S(18);
-    DrawRectangle(toggleX, toggleY, toggleW, toggleH, value ? Color{60,160,80,255} : Color{80,80,80,255});
-    DrawRectangleLines(toggleX, toggleY, toggleW, toggleH, Color{100,100,100,255});
-    int knobX = value ? (toggleX + toggleW - S(16)) : (toggleX + S(2));
-    DrawRectangle(knobX, toggleY + S(2), S(14), S(14), WHITE);
-    
-    if(click && hovered) { value = !value; changed = true; }
-    y += boxH + S(6);
-}
-
-static void DrawSliderRow(int &y, float uiCenterX, const char* label, float &value, Vector2 mPos, bool drag, bool &changed, int sw) {
-    int boxW = S(280), boxH = S(34);
-    int boxX = (int)(uiCenterX - boxW/2);
-    if(boxX < S(10)) boxX = S(10);
-    if(boxX + boxW > sw - S(10)) boxX = sw - S(10) - boxW;
-    
-    DrawText(label, boxX, y, S(13), Color{180,180,180,255});
-    y += S(16);
-    
-    int sliderX = boxX;
-    int sliderW = boxW - S(45);
-    int sliderH = S(6);
-    int sliderY = y + S(5);
-    
-    DrawRectangle(sliderX, sliderY, sliderW, sliderH, Color{50,50,60,255});
-    int fillW = (int)(sliderW * value);
-    DrawRectangle(sliderX, sliderY, fillW, sliderH, Color{80,140,200,255});
-    
-    int knobR = S(8);
-    int knobX = sliderX + fillW;
-    DrawCircle(knobX, sliderY + sliderH/2, (float)knobR, Color{120,180,240,255});
-    
-    Rectangle sliderRect{(float)(sliderX - S(5)), (float)(sliderY - S(10)), (float)(sliderW + S(10)), Sf(26.f)};
-    if(drag && CheckCollisionPointRec(mPos, sliderRect)) {
-        float newVal = (mPos.x - sliderX) / sliderW;
-        if(newVal < 0) newVal = 0; if(newVal > 1) newVal = 1;
-        if(std::fabs(newVal - value) > 0.001f) { value = newVal; changed = true; }
-    }
-    
-    char pctText[16];
-    snprintf(pctText, sizeof(pctText), "%d%%", (int)(value * 100));
-    DrawText(pctText, boxX + boxW - S(38), y + S(2), S(14), RAYWHITE);
-    
-    y += boxH;
-}
-
 static void DrawSelector(int &y, float uiCenterX, const char** options, int optCount, int &selected, Vector2 mPos, bool click, bool &changed, int sw) {
     int boxW = S(280), boxH = S(30);
     int boxX = (int)(uiCenterX - boxW/2);
     if(boxX < S(10)) boxX = S(10);
     if(boxX + boxW > sw - S(10)) boxX = sw - S(10) - boxW;
-    
     int gap = S(3);
     int btnW = (boxW - (optCount-1)*gap) / optCount;
     for(int i = 0; i < optCount; i++) {
@@ -121,42 +41,23 @@ static void DrawDifficultySelector(int &y, float uiCenterX, const char** options
     int boxX = (int)(uiCenterX - boxW/2);
     if(boxX < S(10)) boxX = S(10);
     if(boxX + boxW > sw - S(10)) boxX = sw - S(10) - boxW;
-    
-    Color selColors[3] = {
-        Color{60,160,80,255},   
-        Color{200,160,50,255},  
-        Color{180,60,60,255}    
-    };
-    Color borderColors[3] = {
-        Color{100,220,100,255}, 
-        Color{255,200,80,255},  
-        Color{255,100,100,255}  
-    };
-    
+    Color selColors[3] = {Color{60,160,80,255},Color{200,160,50,255},Color{180,60,60,255}};
+    Color borderColors[3] = {Color{100,220,100,255},Color{255,200,80,255},Color{255,100,100,255}};
     int gap = S(3);
     int btnW = (boxW - 2*gap) / 3;
     for(int i = 0; i < 3; i++) {
         Rectangle rect{(float)(boxX + i*(btnW+gap)), (float)y, (float)btnW, (float)boxH};
         bool sel = (selected == i);
         bool hov = CheckCollisionPointRec(mPos, rect);
-        
         Color bgCol, borderCol;
-        if(sel) {
-            bgCol = selColors[i];
-            borderCol = borderColors[i];
-        } else if(hov) {
-            bgCol = Color{(unsigned char)(selColors[i].r/2), (unsigned char)(selColors[i].g/2), (unsigned char)(selColors[i].b/2), 255};
-            borderCol = Color{80,80,80,255};
-        } else {
-            bgCol = Color{45,55,70,255};
-            borderCol = Color{80,80,80,255};
-        }
-        
+        if(sel) { bgCol = selColors[i]; borderCol = borderColors[i]; }
+        else if(hov) { bgCol = Color{(unsigned char)(selColors[i].r/2),(unsigned char)(selColors[i].g/2),(unsigned char)(selColors[i].b/2),255}; borderCol = Color{80,80,80,255}; }
+        else { bgCol = Color{45,55,70,255}; borderCol = Color{80,80,80,255}; }
         DrawRectangleRec(rect, bgCol);
-        DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, borderCol);
+        DrawRectangleLines((int)rect.x,(int)rect.y,(int)rect.width,(int)rect.height,borderCol);
         int fontSize = S(13);
         int tw = MeasureText(options[i], fontSize);
-        DrawText(options[i], (int)(rect.x + rect.width/2 - tw/2), (int)(rect.y + boxH/2 - fontSize/2), fontSize, RAYWHITE);
+        DrawText(options[i], (int)(rect.x+rect.width/2-tw/2),(int)(rect.y+boxH/2-fontSize/2),fontSize,RAYWHITE);
         if(click && hov && selected != i) { selected = i; changed = true; }
     }
     y += boxH + S(10);
@@ -187,18 +88,18 @@ void Game::DrawMenu(){
     int tabW = S(80), tabH = S(28);
     int tabGap = S(3);
     float tabStartX = uiCenterX - (5 * tabW + 4*tabGap) / 2.f;
-    DrawTabButton(tabStartX, tabY, tabW, tabH, Loc::Tab_Game(), 0, mPos, click);
-    DrawTabButton(tabStartX + (tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Video(), 1, mPos, click);
-    DrawTabButton(tabStartX + 2*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Audio(), 2, mPos, click);
-    DrawTabButton(tabStartX + 3*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Keys(), 3, mPos, click);
-    DrawTabButton(tabStartX + 4*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Effects(), 4, mPos, click);
+    if(Ui::DrawTabButton(tabStartX, tabY, tabW, tabH, Loc::Tab_Game(), 0, menuTab, mPos, click, uiScale)) menuTab=0;
+    if(Ui::DrawTabButton(tabStartX + (tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Video(), 1, menuTab, mPos, click, uiScale)) menuTab=1;
+    if(Ui::DrawTabButton(tabStartX + 2*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Audio(), 2, menuTab, mPos, click, uiScale)) menuTab=2;
+    if(Ui::DrawTabButton(tabStartX + 3*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Keys(), 3, menuTab, mPos, click, uiScale)) menuTab=3;
+    if(Ui::DrawTabButton(tabStartX + 4*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Effects(), 4, menuTab, mPos, click, uiScale)) menuTab=4;
     
     int contentY = tabY + tabH + S(20);
     int y = contentY;
     bool settingsChanged = false;
     
     if(menuTab == 0) {
-        DrawSectionHeader(y, uiCenterX, Loc::Menu_StartGame());
+        Ui::DrawSectionHeader(y, uiCenterX, Loc::Menu_StartGame(), uiScale);
         y += S(8);
         
         DrawText(Loc::Menu_Difficulty(), (int)(uiCenterX - S(140)), y, S(13), Color{180,180,180,255});
@@ -309,7 +210,7 @@ void Game::DrawMenu(){
         DrawText(hsText, (int)(uiCenterX - hsw/2), y, hsFont, Color{255,220,100,255});
     }
     else if(menuTab == 1) {
-        DrawSectionHeader(y, uiCenterX, Loc::Video_Title());
+        Ui::DrawSectionHeader(y, uiCenterX, Loc::Video_Title(), uiScale);
         y += S(8);
         
         DrawText(Loc::Video_Resolution(), (int)(uiCenterX - S(140)), y, S(13), Color{180,180,180,255});
@@ -317,11 +218,11 @@ void Game::DrawMenu(){
         DrawResolutionSelector(y, uiCenterX, mPos, click, sw, uiScale);
         y += S(8);
         
-        DrawToggle(y, uiCenterX, Loc::Video_Fullscreen(), fullscreen, mPos, click, settingsChanged, sw);
+        Ui::DrawToggle(y, uiCenterX, Loc::Video_Fullscreen(), fullscreen, mPos, click, settingsChanged, sw, uiScale);
         if(settingsChanged) { ApplyResolution(false); settingsChanged = false; settingsDirty = true; }
         
         bool vsyncChanged = false;
-        DrawToggle(y, uiCenterX, Loc::Video_VSync(), settings.vsync, mPos, click, vsyncChanged, sw);
+        Ui::DrawToggle(y, uiCenterX, Loc::Video_VSync(), settings.vsync, mPos, click, vsyncChanged, sw, uiScale);
         if(vsyncChanged) { 
             if(settings.vsync) {
                 SetTargetFPS(GetMonitorRefreshRate(GetCurrentMonitor()));
@@ -350,19 +251,19 @@ void Game::DrawMenu(){
             settingsDirty = true;
         }
         
-        DrawToggle(y, uiCenterX, Loc::Video_ShowFPS(), settings.showFPS, mPos, click, settingsChanged, sw);
+        Ui::DrawToggle(y, uiCenterX, Loc::Video_ShowFPS(), settings.showFPS, mPos, click, settingsChanged, sw, uiScale);
         if(settingsChanged) { settingsDirty = true; settingsChanged = false; }
     }
     else if(menuTab == 2) {
-        DrawSectionHeader(y, uiCenterX, Loc::Audio_Title());
+        Ui::DrawSectionHeader(y, uiCenterX, Loc::Audio_Title(), uiScale);
         y += S(8);
         
-        DrawSliderRow(y, uiCenterX, Loc::Audio_Master(), state.audio.masterSlider, mPos, drag, settingsChanged, sw);
-        DrawSliderRow(y, uiCenterX, Loc::Audio_Music(), state.audio.volMusic, mPos, drag, settingsChanged, sw);
-        DrawSliderRow(y, uiCenterX, Loc::Audio_Jump(), state.audio.volJump, mPos, drag, settingsChanged, sw);
-        DrawSliderRow(y, uiCenterX, Loc::Audio_Bounce(), state.audio.volBounce, mPos, drag, settingsChanged, sw);
-        DrawSliderRow(y, uiCenterX, Loc::Audio_Death(), state.audio.volDeath, mPos, drag, settingsChanged, sw);
-        DrawSliderRow(y, uiCenterX, Loc::Audio_ThemeChange(), state.audio.volThemeChange, mPos, drag, settingsChanged, sw);
+        Ui::DrawSlider(y, uiCenterX, Loc::Audio_Master(), state.audio.masterSlider, mPos, drag, settingsChanged, sw, uiScale);
+        Ui::DrawSlider(y, uiCenterX, Loc::Audio_Music(), state.audio.volMusic, mPos, drag, settingsChanged, sw, uiScale);
+        Ui::DrawSlider(y, uiCenterX, Loc::Audio_Jump(), state.audio.volJump, mPos, drag, settingsChanged, sw, uiScale);
+        Ui::DrawSlider(y, uiCenterX, Loc::Audio_Bounce(), state.audio.volBounce, mPos, drag, settingsChanged, sw, uiScale);
+        Ui::DrawSlider(y, uiCenterX, Loc::Audio_Death(), state.audio.volDeath, mPos, drag, settingsChanged, sw, uiScale);
+        Ui::DrawSlider(y, uiCenterX, Loc::Audio_ThemeChange(), state.audio.volThemeChange, mPos, drag, settingsChanged, sw, uiScale);
         
         if(settingsChanged) {
             settingsDirty = true;
@@ -385,7 +286,7 @@ void Game::DrawMenu(){
         }
     }
     else if(menuTab == 3) {
-        DrawSectionHeader(y, uiCenterX, Loc::Keys_Title());
+        Ui::DrawSectionHeader(y, uiCenterX, Loc::Keys_Title(), uiScale);
         y += S(8);
         
         enum RebindTarget { RB_NONE, RB_LEFT, RB_RIGHT, RB_JUMP };
@@ -452,23 +353,23 @@ void Game::DrawMenu(){
         }
     }
     else if(menuTab == 4) {
-        DrawSectionHeader(y, uiCenterX, Loc::Effects_Title());
+        Ui::DrawSectionHeader(y, uiCenterX, Loc::Effects_Title(), uiScale);
         y += S(8);
         
         bool shakeChanged = false;
-        DrawToggle(y, uiCenterX, Loc::Effects_ScreenShake(), settings.screenShake, mPos, click, shakeChanged, sw);
+        Ui::DrawToggle(y, uiCenterX, Loc::Effects_ScreenShake(), settings.screenShake, mPos, click, shakeChanged, sw, uiScale);
         if(shakeChanged) settingsDirty = true;
         
         bool partChanged = false;
-        DrawToggle(y, uiCenterX, Loc::Effects_Particles(), settings.particles, mPos, click, partChanged, sw);
+        Ui::DrawToggle(y, uiCenterX, Loc::Effects_Particles(), settings.particles, mPos, click, partChanged, sw, uiScale);
         if(partChanged) settingsDirty = true;
         
         bool comboChanged = false;
-        DrawToggle(y, uiCenterX, Loc::Effects_ComboFire(), settings.comboEffects, mPos, click, comboChanged, sw);
+        Ui::DrawToggle(y, uiCenterX, Loc::Effects_ComboFire(), settings.comboEffects, mPos, click, comboChanged, sw, uiScale);
         if(comboChanged) settingsDirty = true;
         
         bool powerUpChanged = false;
-        DrawToggle(y, uiCenterX, Loc::Effects_PowerUp(), settings.powerUpEffects, mPos, click, powerUpChanged, sw);
+        Ui::DrawToggle(y, uiCenterX, Loc::Effects_PowerUp(), settings.powerUpEffects, mPos, click, powerUpChanged, sw, uiScale);
         if(powerUpChanged) settingsDirty = true;
         
         y += S(25);
@@ -479,11 +380,7 @@ void Game::DrawMenu(){
         }
     }
     
-    state.audio.masterVolume = 0.0001f + state.audio.masterSlider * 1.0f;
-    SetMasterVolume(state.audio.masterVolume);
-    if(state.audio.musicBg.ctxData) {
-        SetMusicVolume(state.audio.musicBg, state.audio.volMusic * VOL_MUSIC_MULT);
-    }
+    ApplyMenuAudioVolumes();
     
     {
         static bool langBoxOpen = false;

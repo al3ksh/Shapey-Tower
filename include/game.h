@@ -18,6 +18,7 @@
 #include "screen_shake.h"
 #include "parallax.h"
 #include "achievements.h"
+#include "rng.h"
 
 namespace UiLayout {
     inline constexpr int ButtonGap = 18;
@@ -102,6 +103,7 @@ struct GameState {
     std::vector<Achievement> achievements;
     std::string lastUnlockedAchievement;
     float achievementPopupTimer = 0.f;
+    GameRNG rng;
 };
 
 struct GameConfig {
@@ -164,9 +166,12 @@ private:
     void ChangeScreen(GameState::Screen next, bool withFade=true);
     void EmitLandingParticles(Vector2 contact,int count);
     void EmitWallBounceParticles(Vector2 contact,int count);
+    void SpawnOnePlatform(float y);
+    void ApplyThemeIfNeeded();
     void DrawResolutionSelector(int &y, float uiCenterX, Vector2 mPos, bool click, int sw, float scale = 1.0f);
     void DrawAudioSliders(int &y, float uiCenterX, Vector2 mPos, int sw, bool &changedOut);
     void ApplyAudioVolumes();
+    void ApplyMenuAudioVolumes();
     template<typename RebindEnum>
     Rectangle DrawRebindKey(int &y, float uiCenterX, Vector2 mPos, int sw, const char* label, int key, RebindEnum active, RebindEnum selfId, bool &clicked, float blinkAlpha, Rectangle &lastHover, const char* &lastDefault, const char* defaultTxt, bool &activeChanged){
         auto clampX=[&](int desired,int w){ int x=desired; if(x<10) x=10; if(x+w>sw-10) x=sw-10-w; return x; };
