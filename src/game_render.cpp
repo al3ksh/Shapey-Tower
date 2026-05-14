@@ -3,6 +3,7 @@
 #include "collectibles.h"
 #include "localization.h"
 #include "daily_challenge.h"
+#include "tutorial.h"
 #include <cmath>
 
 #include "debug.h"
@@ -82,6 +83,18 @@ void Game::DrawGameWorld(float dt){
         float cy = state.player.pos.y + state.player.height/2;
         DrawCircleLines((int)cx, (int)cy, radius, Color{150, 220, 255, alpha});
         DrawCircleLines((int)cx, (int)cy, radius * 0.7f, Color{200, 240, 255, (unsigned char)(alpha * 0.5f)});
+    }
+    
+    if(state.wallSlidingLeft || state.wallSlidingRight) {
+        float cx = state.player.pos.x + state.player.width/2;
+        float cy = state.player.pos.y + state.player.height;
+        unsigned char sa = (unsigned char)(120 + 60 * std::sin(state.animTime * 12.f));
+        for(int i = 0; i < 3; i++) {
+            float yOff = (float)i * 12.f;
+            float xOff = state.wallSlidingLeft ? 5.f : -5.f;
+            float sz = 3.f + (float)i * 0.5f;
+            DrawCircle((int)(cx + xOff), (int)(cy - yOff - 5.f), (int)sz, Color{200, 220, 255, (unsigned char)(sa - i * 30)});
+        }
     }
     
     EndMode2D();
@@ -334,6 +347,9 @@ void Game::DrawGame(float dt){
         DrawRectangle(0, 0, cfg.gameWidth, cfg.gameHeight, Color{255, 255, 255, a});
     }
     if(state.fadeAlpha>0.01f) DrawRectangle(0,0,cfg.gameWidth,cfg.gameHeight,{0,0,0,(unsigned char)(state.fadeAlpha*255)});
+    
+    DrawTutorialOverlay(state.tutorial, cfg.gameWidth, cfg.gameHeight);
+    
     EndTextureMode();
     int winW=GetScreenWidth(), winH=GetScreenHeight(); float scale=std::fmin((float)winW/cfg.gameWidth,(float)winH/cfg.gameHeight); int drawW=(int)(cfg.gameWidth*scale); int drawH=(int)(cfg.gameHeight*scale); int offX=(winW-drawW)/2; int offY=(winH-drawH)/2; viewportRect={(float)offX,(float)offY,(float)drawW,(float)drawH};
     BeginDrawing();

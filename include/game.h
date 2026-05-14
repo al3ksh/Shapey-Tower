@@ -19,6 +19,9 @@
 #include "parallax.h"
 #include "achievements.h"
 #include "rng.h"
+#include "tutorial.h"
+#include "stats.h"
+#include "leaderboard.h"
 
 namespace UiLayout {
     inline constexpr int ButtonGap = 18;
@@ -103,6 +106,17 @@ struct GameState {
     std::string lastUnlockedAchievement;
     float achievementPopupTimer = 0.f;
     GameRNG rng;
+    TutorialState tutorial;
+    GamepadState gamepad;
+    GameStats stats;
+    int currentRunPlatforms = 0;
+    int currentRunJumps = 0;
+    int currentRunPowerUps = 0;
+    int currentRunBestCombo = 0;
+    bool wallSlidingLeft = false;
+    bool wallSlidingRight = false;
+    float wallSlideGravity = 200.f;
+    Leaderboard leaderboard;
 };
 
 struct GameConfig {

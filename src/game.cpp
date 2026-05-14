@@ -1,5 +1,6 @@
 #include "game.h"
 #include "debug.h"
+#include "tutorial.h"
 #include <cstdlib>
 #include <ctime>
 #include <algorithm>
@@ -127,8 +128,14 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
     state.dailyChallenge = GetTodaysChallenge();
     state.dailyChallenge.bestScore = LoadDailyHighScore("daily_highscore.txt", 
         state.dailyChallenge.year, state.dailyChallenge.month, state.dailyChallenge.day);
+    LoadStats("stats.txt", state.stats);
+    LoadLeaderboard("leaderboard.txt", state.leaderboard);
     ApplyResolution();
     ApplyAudioVolumes();
+    
+    if (!LoadTutorialDone("tutorial_done.txt")) {
+        state.tutorial.active = false;
+    }
 }
 
 Game::~Game(){
@@ -148,6 +155,8 @@ Game::~Game(){
 
     SaveSettings("settings.cfg", settings);
     SaveHighScore("highscore.txt", state.highScore);
+    SaveStats("stats.txt", state.stats);
+    SaveLeaderboard("leaderboard.txt", state.leaderboard);
     
     {
         std::vector<std::string> unlocked;
@@ -245,6 +254,10 @@ void Game::ResetGame(){
     for(int i=0; i<4; i++) state.powerUpTimers[i] = 0.f;
     state.totalCoins = 0;
     state.screenShake = ScreenShake{};
+    state.currentRunPlatforms = 0;
+    state.currentRunJumps = 0;
+    state.currentRunPowerUps = 0;
+    state.currentRunBestCombo = 0;
     
     state.platforms.push_back({Rectangle{0,(float)cfg.gameHeight-60.f,(float)cfg.gameWidth,20.f}});
     state.player.pos = {cfg.gameWidth/2.f - state.player.width/2, state.platforms[0].rect.y - state.player.height};
@@ -279,6 +292,7 @@ void Game::RevivePlayer(){
     SaveGlobalCoins("coins.txt", state.globalCoins);
     state.hasRevivedThisRun = true;
     state.gameOver = false;
+    state.stats.revives++;
     
     float safeY = state.cameraTopY + cfg.gameHeight * 0.3f;
     const Platform* bestPlatform = nullptr;
@@ -421,7 +435,7 @@ void Game::Update(){
     if(ShouldClose()){ running=false; return; }
     if(IsKeyPressed(KEY_GRAVE)) { running=false; return; }
     if(IsKeyPressed(KEY_F3)) { settings.showFPS = !settings.showFPS; settingsDirty = true; settingsSaveTimer = 0.f; }
-    if(IsKeyPressed(KEY_ESCAPE)){
+    if(IsKeyPressed(KEY_ESCAPE) || state.gamepad.startPressed || state.gamepad.backPressed){
         switch(state.currentScreen){
             case GameState::Screen::MENU: running=false; break;
             case GameState::Screen::GAME: ChangeScreen(GameState::Screen::PAUSE); break;
@@ -433,6 +447,9 @@ void Game::Update(){
     }
     float dt=GetFrameTime();
     AutoSaveSettings(dt);
+    
+    UpdateGamepadState(state.gamepad);
+    
     if(state.audio.musicBg.ctxData){ UpdateMusicStream(state.audio.musicBg); }
     UpdateFade(dt);
     switch(state.currentScreen){
@@ -440,6 +457,7 @@ void Game::Update(){
         case GameState::Screen::PAUSE: DrawPause(); break;
         case GameState::Screen::GAME:
             UpdateGameplay(dt);
+            state.stats.totalPlayTime += dt;
             DrawGame(dt);
             break;
         case GameState::Screen::GAMEOVER:
@@ -462,6 +480,12 @@ void Game::UpdateGameplay(float dt){
         ChangeScreen(GameState::Screen::GAMEOVER,false); 
     }
     
+    if(IsTutorialActive(state.tutorial) && IsKeyPressed(KEY_ESCAPE)) {
+        state.tutorial.currentStep = TutorialStep::DONE;
+        state.tutorial.active = false;
+        SaveTutorialDone("tutorial_done.txt");
+    }
+    
     float effectiveDt = dt * state.slowMotionFactor;
     
     state.animTime += dt;
@@ -469,6 +493,8 @@ void Game::UpdateGameplay(float dt){
     
     if(state.shieldFlashAlpha > 0) state.shieldFlashAlpha -= dt * 4.f;
     if(state.doubleJumpEffectTimer > 0) state.doubleJumpEffectTimer -= dt;
+    
+    UpdateGamepadState(state.gamepad);
     
     for (auto it = state.activePowerUps.begin(); it != state.activePowerUps.end();) {
         it->timeRemaining -= dt;
@@ -482,7 +508,10 @@ void Game::UpdateGameplay(float dt){
     
     state.lastVerticalVelocity = state.player.vel.y;
     float dir=0.f; if(IsKeyDown(state.keys.left)) dir-=1.f; if(IsKeyDown(state.keys.right)) dir+=1.f;
-    bool jumpPressed=IsKeyPressed(state.keys.jump); bool jumpDown=IsKeyDown(state.keys.jump);
+    if(state.gamepad.active) dir += state.gamepad.leftX;
+    if(dir > 1.f) dir = 1.f; if(dir < -1.f) dir = -1.f;
+    bool jumpPressed=IsKeyPressed(state.keys.jump) || state.gamepad.jumpPressed;
+    bool jumpDown=IsKeyDown(state.keys.jump) || state.gamepad.jumpDown;
     if(jumpPressed || jumpDown) state.jumpBufferTimer=cfg.JUMP_BUFFER; else if(state.jumpBufferTimer>0) state.jumpBufferTimer-=dt;
     if(state.onGround) { state.coyoteTimer=cfg.COYOTE_TIME; state.doubleJumpUsed = false; }
     else if(state.coyoteTimer>0) state.coyoteTimer-=dt;
@@ -538,6 +567,12 @@ void Game::UpdateGameplay(float dt){
                         int floorsJumped=(int)(deltaY/95.f); if(floorsJumped<1) floorsJumped=1;
                         if(state.comboTimer>0) state.comboCount++; else state.comboCount=1; state.comboTimer=cfg.COMBO_WINDOW;
                         
+                        if(state.tutorial.active && state.tutorial.currentStep == TutorialStep::LAND_ON_PLATFORMS) {
+                            state.tutorial.platformsLanded++;
+                        }
+                        state.currentRunPlatforms++;
+                        if(state.comboCount > state.currentRunBestCombo) state.currentRunBestCombo = state.comboCount;
+                        
                         if(state.comboCount >= 10 && settings.screenShake) TriggerShake(state.screenShake, 2.f + state.comboCount * 0.1f, 0.08f);
                         
                         constexpr int MIN_COMBO = 10;
@@ -557,16 +592,35 @@ void Game::UpdateGameplay(float dt){
         float jumpSpeed=cfg.BASE_JUMP_SPEED - cfg.EXTRA_JUMP_BOOST*speedRatio;
         state.player.vel.y=jumpSpeed; state.onGround=false; state.coyoteTimer=0.f; state.jumpBufferTimer=0.f;
         state.landingSquashActive = false;
+        state.currentRunJumps++;
         if(state.audio.sndJump.frameCount>0){ SetSoundVolume(state.audio.sndJump, state.audio.volJump * VOL_JUMP_MULT * VOLUME_SCALE); PlaySound(state.audio.sndJump);} 
     } else if(wantsDoubleJump) {
         state.player.vel.y = cfg.BASE_JUMP_SPEED * 0.85f;
         state.doubleJumpUsed = true;
         state.jumpBufferTimer = 0.f;
-        state.doubleJumpEffectTimer = 0.3f; // Trigger visual effect
+        state.doubleJumpEffectTimer = 0.3f;
+        state.currentRunJumps++;
         if(state.audio.sndJump.frameCount>0){ SetSoundVolume(state.audio.sndJump, state.audio.volJump * VOL_JUMP_MULT * VOLUME_SCALE * 0.8f); PlaySound(state.audio.sndJump);}
     }
     
     if(state.comboTimer>0){ state.comboTimer-=dt; if(state.comboTimer<=0){ state.comboTimer=0; state.comboCount=0; }}
+
+    state.wallSlidingLeft = false;
+    state.wallSlidingRight = false;
+    if(!state.onGround && state.player.vel.y > 0) {
+        float slideDir = 0.f;
+        if(state.player.pos.x <= 2.f && (IsKeyDown(state.keys.left) || (state.gamepad.active && state.gamepad.leftX < -0.4f))) {
+            state.wallSlidingLeft = true;
+            slideDir = 1.f;
+        }
+        if(state.player.pos.x + state.player.width >= (float)cfg.gameWidth - 2.f && (IsKeyDown(state.keys.right) || (state.gamepad.active && state.gamepad.leftX > 0.4f))) {
+            state.wallSlidingRight = true;
+            slideDir = 1.f;
+        }
+        if(slideDir > 0.f && state.player.vel.y > state.wallSlideGravity) {
+            state.player.vel.y = state.wallSlideGravity;
+        }
+    }
 
     const float restitution=0.95f; const float wallImpulse=80.f; if(state.player.pos.x<0.f){ state.player.pos.x=0.f; if(state.player.vel.x<0){ state.player.vel.x=-state.player.vel.x*restitution + wallImpulse; EmitWallBounceParticles({0.f,state.player.pos.y+state.player.height/2},6); if(state.audio.sndBounce.frameCount>0){ SetSoundVolume(state.audio.sndBounce, state.audio.volBounce*VOLUME_SCALE); PlaySound(state.audio.sndBounce);} } } if(state.player.pos.x+state.player.width>(float)cfg.gameWidth){ state.player.pos.x=(float)cfg.gameWidth-state.player.width; if(state.player.vel.x>0){ state.player.vel.x=-state.player.vel.x*restitution - wallImpulse; EmitWallBounceParticles({(float)cfg.gameWidth,state.player.pos.y+state.player.height/2},6); if(state.audio.sndBounce.frameCount>0){ SetSoundVolume(state.audio.sndBounce, state.audio.volBounce*VOLUME_SCALE); PlaySound(state.audio.sndBounce);} } }
 
@@ -591,6 +645,9 @@ void Game::UpdateGameplay(float dt){
             state.totalCoins++;
             state.globalCoins++;
             SaveGlobalCoins("coins.txt", state.globalCoins);
+            if(state.tutorial.active && state.tutorial.currentStep == TutorialStep::COLLECT_COINS) {
+                state.tutorial.coinDone = true;
+            }
             if(state.audio.sndCoin.frameCount>0){ SetSoundVolume(state.audio.sndCoin, state.audio.volCoin * VOL_COIN_MULT * VOLUME_SCALE); PlaySound(state.audio.sndCoin); }
             if(settings.particles) {
                 for(int j=0;j<6;j++) {
@@ -638,6 +695,7 @@ void Game::UpdateGameplay(float dt){
             state.activePowerUps.erase(std::remove_if(state.activePowerUps.begin(), state.activePowerUps.end(),
                 [&pu](const ActivePowerUp& p){ return p.type == pu.type; }), state.activePowerUps.end());
             state.activePowerUps.push_back({pu.type, duration});
+            state.currentRunPowerUps++;
             if(state.audio.sndPowerUp.frameCount>0){ SetSoundVolume(state.audio.sndPowerUp, state.audio.volPowerUp * VOL_POWERUP_MULT * VOLUME_SCALE); PlaySound(state.audio.sndPowerUp); }
             if(settings.screenShake) TriggerShake(state.screenShake, 3.f, 0.1f);
         }
@@ -660,6 +718,13 @@ void Game::UpdateGameplay(float dt){
         }
     }
     if(state.achievementPopupTimer > 0) state.achievementPopupTimer -= dt;
+
+    if(state.tutorial.active) {
+        UpdateTutorial(state.tutorial, dt, state.keys);
+        if(state.tutorial.currentStep == TutorialStep::DONE) {
+            SaveTutorialDone("tutorial_done.txt");
+        }
+    }
 
     DifficultySettings diffSettings = GetDifficultySettings(state.difficulty);
     float gapMult = diffSettings.gapMultiplier;
@@ -691,6 +756,17 @@ void Game::UpdateGameplay(float dt){
             if(state.isDailyRun && state.score > state.dailyChallenge.bestScore) {
                 state.dailyChallenge.bestScore = state.score;
             }
+            state.stats.gamesPlayed++;
+            state.stats.totalScore += state.score;
+            if(state.score > state.stats.bestScore) state.stats.bestScore = state.score;
+            state.stats.totalCoinsCollected += state.sessionCoins;
+            if(state.currentRunBestCombo > state.stats.bestCombo) state.stats.bestCombo = state.currentRunBestCombo;
+            state.stats.totalPlatformsLanded += state.currentRunPlatforms;
+            if(state.currentRunPlatforms > state.stats.bestPlatformStreak) state.stats.bestPlatformStreak = state.currentRunPlatforms;
+            state.stats.totalPowerUpsCollected += state.currentRunPowerUps;
+            state.stats.totalJumps += state.currentRunJumps;
+            state.stats.deaths++;
+            AddLeaderboardEntry(state.leaderboard, {state.score, state.sessionCoins, state.currentRunBestCombo, state.isDailyRun});
             if(state.audio.musicBg.ctxData){ PauseMusicStream(state.audio.musicBg); state.musicPausedOnDeath=true; } 
             if(state.audio.sndDeath.frameCount>0){ SetSoundVolume(state.audio.sndDeath, state.audio.volDeath * VOL_DEATH_MULT * VOLUME_SCALE); PlaySound(state.audio.sndDeath);}
             

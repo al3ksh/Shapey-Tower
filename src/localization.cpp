@@ -131,3 +131,49 @@ const char* Loc::Daily_Desc_NoPowerups() { return LOC("No power-ups, pure skill!
 const char* Loc::Daily_Desc_CoinRush() { return LOC("Extra coins everywhere!", "Dodatkowe monety wszedzie!"); }
 const char* Loc::Daily_Desc_MixedChaos() { return LOC("Random special platforms!", "Losowe specjalne platformy!"); }
 const char* Loc::Daily_Desc_SpeedDemon() { return LOC("Faster scrolling speed!", "Szybsze tempo gry!"); }
+
+const char* Loc::Tutorial_Welcome() { return LOC("Welcome to Shapey Tower!", "Witaj w Shapey Tower!"); }
+const char* Loc::Tutorial_WelcomeSub() { return LOC("Let's learn the basics. Ready?", "Nauczmy sie podstaw. Gotowy?"); }
+const char* Loc::Tutorial_Move() { return LOC("Use A / D to move", "Uzyj A / D do poruszania sie"); }
+const char* Loc::Tutorial_MoveSub() { return LOC("Try moving left and right", "Sprobuj ruszyc sie w lewo i prawo"); }
+const char* Loc::Tutorial_Jump() { return LOC("Press SPACE to jump!", "Nacisnij SPACE aby skoczyc!"); }
+const char* Loc::Tutorial_JumpSub() { return LOC("Jump to reach higher platforms", "Skacz, by dotrzec na wyzsze platformy"); }
+const char* Loc::Tutorial_Land() { return LOC("Land on platforms to score!", "Laduj na platformach, by zdobywac punkty!"); }
+const char* Loc::Tutorial_LandSub() { return LOC("Land on 3 platforms to continue", "Wyladuj na 3 platformach, by kontynuowac"); }
+const char* Loc::Tutorial_Coins() { return LOC("Collect coins for bonus points!", "Zbieraj monety za dodatkowe punkty!"); }
+const char* Loc::Tutorial_CoinsSub() { return LOC("Gold orbs floating above platforms", "Zlote kulki unoszace sie nad platformami"); }
+const char* Loc::Tutorial_Special() { return LOC("Watch for special platforms!", "Zauwaz specjalne platformy!"); }
+const char* Loc::Tutorial_SpecialSub() { return LOC("Green=spring  Blue=ice  Brown=crumbling", "Zielona=sprezyna  Niebieska=lod  Brazowa=krucha"); }
+const char* Loc::Tutorial_Combo() { return LOC("Land quickly for combos!", "Laduj szybko, by robic combo!"); }
+const char* Loc::Tutorial_ComboSub() { return LOC("Chain landings within 2s for multiplier", "Lancuch ladowan w ciagu 2s = mnoznik"); }
+const char* Loc::Tutorial_PowerUps() { return LOC("Grab power-ups for abilities!", "Zbieraj power-upy dla zdolnosci!"); }
+const char* Loc::Tutorial_PowerUpsSub() { return LOC("Shield, Double Jump, Slow-mo, Magnet", "Tarcza, Podwojny skok, Spowolnienie, Magnes"); }
+const char* Loc::Tutorial_Scroll() { return LOC("The screen scrolls up - don't fall!", "Ekran scrolluje w gore - nie spadnij!"); }
+const char* Loc::Tutorial_ScrollSub() { return LOC("It gets faster over time. Good luck!", "Z czasem przyspiesza. Powodzenia!"); }
+const char* Loc::Tutorial_Progress() { return LOC("Done:", "Zrobione:"); }
+const char* Loc::Tutorial_Ok() { return LOC("Great!", "Swietnie!"); }
+const char* Loc::Tutorial_Waiting() { return LOC("Waiting for jump...", "Czekam na skok..."); }
+const char* Loc::Tutorial_Optional() { return LOC("(skip in a moment)", "(pominie za moment)"); }
+const char* Loc::Tutorial_Skip() { return LOC("[ESC] skip tutorial", "[ESC] pomin samouczek"); }
+
+const char* Loc::Tab_Stats() { return LOC("STATS", "STATY"); }
+const char* Loc::Stats_GamesPlayed() { return LOC("Games Played", "Gry rozegrane"); }
+const char* Loc::Stats_BestScore() { return LOC("Best Score", "Najlepszy wynik"); }
+const char* Loc::Stats_TotalScore() { return LOC("Total Score", "Suma wynikow"); }
+const char* Loc::Stats_CoinsCollected() { return LOC("Coins Collected", "Zebrane monety"); }
+const char* Loc::Stats_BestCombo() { return LOC("Best Combo", "Najlepsze combo"); }
+const char* Loc::Stats_PlatformsLanded() { return LOC("Platforms Landed", "Ladowan na platformach"); }
+const char* Loc::Stats_BestStreak() { return LOC("Best Streak", "Najlepsza seria"); }
+const char* Loc::Stats_PowerUps() { return LOC("Power-ups Collected", "Zebrane power-upy"); }
+const char* Loc::Stats_TotalJumps() { return LOC("Total Jumps", "Wszystkie skoki"); }
+const char* Loc::Stats_Deaths() { return LOC("Deaths", "Smierci"); }
+const char* Loc::Stats_Revives() { return LOC("Revives", "Wskrzeszenia"); }
+const char* Loc::Stats_PlayTime() { return LOC("Play Time", "Czas gry"); }
+const char* Loc::Stats_Leaderboard() { return LOC("Leaderboard", "Tablica wynikow"); }
+const char* Loc::Stats_Rank() { return LOC("#", "#"); }
+const char* Loc::Stats_LBHeader() { return LOC("Score  Coins  Combo", "Wynik  Monety  Combo"); }
+const char* Loc::Stats_Achievements() { return LOC("Achievements", "Osiagniecia"); }
+const char* Loc::Stats_AchUnlocked() { return LOC("unlocked", "odblokowane"); }
+const char* Loc::Stats_SubStats() { return LOC("Stats", "Statystyki"); }
+const char* Loc::Stats_SubLeaderboard() { return LOC("Scores", "Wyniki"); }
+const char* Loc::Stats_SubAchievements() { return LOC("Achivs", "Osiag."); }

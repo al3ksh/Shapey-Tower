@@ -1,5 +1,45 @@
 #include "input.h"
 #include <string>
+#include <cmath>
+
+void UpdateGamepadState(GamepadState &gp) {
+    gp.active = IsGamepadAvailable(gp.gamepadId);
+    if (!gp.active) {
+        gp.leftX = 0.f;
+        gp.leftY = 0.f;
+        gp.jumpPressed = false;
+        gp.jumpDown = false;
+        gp.startPressed = false;
+        gp.backPressed = false;
+        return;
+    }
+
+    float ax = GetGamepadAxisMovement(gp.gamepadId, GAMEPAD_AXIS_LEFT_X);
+    float ay = GetGamepadAxisMovement(gp.gamepadId, GAMEPAD_AXIS_LEFT_Y);
+    auto deadzoneFilter = [d = gp.deadzone](float v) {
+        if (std::fabs(v) < d) return 0.f;
+        float sign = v < 0 ? -1.f : 1.f;
+        float norm = (std::fabs(v) - d) / (1.f - d);
+        return sign * norm;
+    };
+    gp.leftX = deadzoneFilter(ax);
+    gp.leftY = deadzoneFilter(ay);
+
+    gp.jumpPressed = IsGamepadButtonPressed(gp.gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
+                     IsGamepadButtonPressed(gp.gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_UP);
+    gp.jumpDown = IsGamepadButtonDown(gp.gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
+                  IsGamepadButtonDown(gp.gamepadId, GAMEPAD_BUTTON_RIGHT_FACE_UP);
+
+    gp.startPressed = IsGamepadButtonPressed(gp.gamepadId, GAMEPAD_BUTTON_MIDDLE_RIGHT);
+    gp.backPressed = IsGamepadButtonPressed(gp.gamepadId, GAMEPAD_BUTTON_MIDDLE_LEFT);
+}
+
+float GetGamepadAxisClamped(const GamepadState &gp, int axis) {
+    if (!gp.active) return 0.f;
+    float v = GetGamepadAxisMovement(gp.gamepadId, axis);
+    if (std::fabs(v) < gp.deadzone) return 0.f;
+    return v;
+}
 
 const char* KeyName(int key){
     switch(key){

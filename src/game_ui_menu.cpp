@@ -6,6 +6,9 @@
 #include "input.h"
 #include "localization.h"
 #include "ui_helpers.h"
+#include "tutorial.h"
+#include "leaderboard.h"
+#include "stats.h"
 #include <cmath>
 
 static int menuTab = 0;
@@ -85,14 +88,15 @@ void Game::DrawMenu(){
     DrawText("v1.5", sw - S(45), sh - S(22), S(12), Color{70,70,70,255});
     
     int tabY = S(72);
-    int tabW = S(80), tabH = S(28);
+    int tabW = S(68), tabH = S(28);
     int tabGap = S(3);
-    float tabStartX = uiCenterX - (5 * tabW + 4*tabGap) / 2.f;
+    float tabStartX = uiCenterX - (6 * tabW + 5*tabGap) / 2.f;
     if(Ui::DrawTabButton(tabStartX, tabY, tabW, tabH, Loc::Tab_Game(), 0, menuTab, mPos, click, uiScale)) menuTab=0;
     if(Ui::DrawTabButton(tabStartX + (tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Video(), 1, menuTab, mPos, click, uiScale)) menuTab=1;
     if(Ui::DrawTabButton(tabStartX + 2*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Audio(), 2, menuTab, mPos, click, uiScale)) menuTab=2;
     if(Ui::DrawTabButton(tabStartX + 3*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Keys(), 3, menuTab, mPos, click, uiScale)) menuTab=3;
     if(Ui::DrawTabButton(tabStartX + 4*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Effects(), 4, menuTab, mPos, click, uiScale)) menuTab=4;
+    if(Ui::DrawTabButton(tabStartX + 5*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Stats(), 5, menuTab, mPos, click, uiScale)) menuTab=5;
     
     int contentY = tabY + tabH + S(20);
     int y = contentY;
@@ -136,6 +140,9 @@ void Game::DrawMenu(){
             ResetGame();
             state.started = true;
             state.paused = false;
+            if(!LoadTutorialDone("tutorial_done.txt")) {
+                StartTutorial(state.tutorial);
+            }
             ChangeScreen(GameState::Screen::GAME);
         }
         y += S(16);
@@ -383,6 +390,135 @@ void Game::DrawMenu(){
             ResetSettingsToDefaults();
         }
     }
+    else if(menuTab == 5) {
+        static int statsSubTab = 0;
+        int subW = S(85), subH = S(24);
+        int subGap = S(3);
+        float subStartX = uiCenterX - (3 * subW + 2 * subGap) / 2.f;
+        if(Ui::DrawTabButton(subStartX, y, subW, subH, Loc::Stats_SubAchievements(), 0, statsSubTab, mPos, click, uiScale)) statsSubTab = 0;
+        if(Ui::DrawTabButton(subStartX + (subW+subGap), y, subW, subH, Loc::Stats_SubLeaderboard(), 1, statsSubTab, mPos, click, uiScale)) statsSubTab = 1;
+        if(Ui::DrawTabButton(subStartX + 2*(subW+subGap), y, subW, subH, Loc::Stats_SubStats(), 2, statsSubTab, mPos, click, uiScale)) statsSubTab = 2;
+        y += subH + S(12);
+        
+        if(statsSubTab == 0) {
+            Ui::DrawSectionHeader(y, uiCenterX, Loc::Stats_Achievements(), uiScale);
+            y += S(6);
+            
+            int achUnlocked = 0;
+            for (auto &ach : state.achievements) if (ach.unlocked) achUnlocked++;
+            char achCount[64];
+            snprintf(achCount, sizeof(achCount), "%d/%d %s", achUnlocked, (int)state.achievements.size(), Loc::Stats_AchUnlocked());
+            int acw = MeasureText(achCount, S(13));
+            DrawText(achCount, (int)(uiCenterX - acw/2), y, S(13), Color{255, 200, 80, 255});
+            y += S(18);
+            
+            for (auto &ach : state.achievements) {
+                int rowW = S(280), rowH = S(26);
+                int rowX = (int)(uiCenterX - rowW/2);
+                if(rowX < S(10)) rowX = S(10);
+                if(rowX + rowW > sw - S(10)) rowX = sw - S(10) - rowW;
+                
+                Color bg = ach.unlocked ? Color{25, 45, 30, 255} : Color{35, 35, 45, 255};
+                DrawRectangle(rowX, y, rowW, rowH, bg);
+                DrawRectangleLines(rowX, y, rowW, rowH, ach.unlocked ? Color{60, 120, 60, 200} : Color{50, 50, 60, 200});
+                
+                const char *icon = ach.unlocked ? "*" : "-";
+                DrawText(icon, rowX + S(6), y + S(6), S(14), ach.unlocked ? Color{255, 200, 80, 255} : Color{80, 80, 80, 255});
+                
+                DrawText(ach.name.c_str(), rowX + S(22), y + S(3), S(12), ach.unlocked ? RAYWHITE : Color{120, 120, 120, 255});
+                DrawText(ach.description.c_str(), rowX + S(22), y + S(14), S(10), ach.unlocked ? Color{170, 170, 170, 255} : Color{70, 70, 70, 255});
+                
+                y += rowH + S(4);
+                if(y > sh - S(80)) break;
+            }
+        }
+        else if(statsSubTab == 1) {
+            Ui::DrawSectionHeader(y, uiCenterX, Loc::Stats_Leaderboard(), uiScale);
+            y += S(6);
+            
+            int hdrFont = S(12);
+            int hdrW = MeasureText(Loc::Stats_LBHeader(), hdrFont);
+            DrawText(Loc::Stats_LBHeader(), (int)(uiCenterX - hdrW/2), y, hdrFont, Color{100, 160, 220, 255});
+            y += S(18);
+            
+            int shown = 0;
+            for (auto &e : state.leaderboard.entries) {
+                if(shown >= 10) break;
+                char line[128];
+                snprintf(line, sizeof(line), "%d.  %d   %d   x%d%s", shown + 1, e.score, e.coins, e.combo, e.isDaily ? " [D]" : "");
+                int lineFont = S(13);
+                int lineW = MeasureText(line, lineFont);
+                int lineX = (int)(uiCenterX - lineW/2);
+                if(lineX < S(10)) lineX = S(10);
+                
+                int rowW = S(280), rowH = S(22);
+                int rowX = (int)(uiCenterX - rowW/2);
+                if(rowX < S(10)) rowX = S(10);
+                if(rowX + rowW > sw - S(10)) rowX = sw - S(10) - rowW;
+                Color rowBg = (shown % 2 == 0) ? Color{25, 30, 45, 255} : Color{30, 35, 50, 255};
+                DrawRectangle(rowX, y, rowW, rowH, rowBg);
+                
+                Color lineCol = (shown == 0) ? Color{255, 215, 80, 255} : (shown == 1) ? Color{200, 200, 210, 255} : (shown == 2) ? Color{180, 130, 80, 255} : Color{160, 160, 170, 255};
+                DrawText(line, lineX, y + S(3), lineFont, lineCol);
+                y += rowH + S(3);
+                shown++;
+            }
+            if(shown == 0) {
+                const char *empty = Loc::GetLanguage() == Language::EN ? "No entries yet" : "Brak wynikow";
+                int ew = MeasureText(empty, S(14));
+                DrawText(empty, (int)(uiCenterX - ew/2), y, S(14), Color{100, 100, 110, 255});
+            }
+        }
+        else if(statsSubTab == 2) {
+            Ui::DrawSectionHeader(y, uiCenterX, Loc::GetLanguage() == Language::EN ? "Statistics" : "Statystyki", uiScale);
+            y += S(8);
+            
+            int statFont = S(14);
+            int statValFont = S(14);
+            auto drawStatRow = [&](const char *label, const char *valStr, Color valCol = Color{255, 220, 140, 255}) {
+                int rowW2 = S(260), rowH2 = S(24);
+                int rowX2 = (int)(uiCenterX - rowW2/2);
+                if(rowX2 < S(10)) rowX2 = S(10);
+                if(rowX2 + rowW2 > sw - S(10)) rowX2 = sw - S(10) - rowW2;
+                DrawRectangle(rowX2, y, rowW2, rowH2, Color{30, 35, 50, 255});
+                DrawText(label, rowX2 + S(10), y + S(5), statFont, Color{180, 180, 190, 255});
+                int vw = MeasureText(valStr, statValFont);
+                DrawText(valStr, rowX2 + rowW2 - vw - S(10), y + S(5), statValFont, valCol);
+                y += rowH2 + S(3);
+            };
+            
+            int mins = (int)(state.stats.totalPlayTime) / 60;
+            int hrs = mins / 60;
+            char timeStr[32];
+            if(hrs > 0) snprintf(timeStr, sizeof(timeStr), "%dh %dm", hrs, mins % 60);
+            else snprintf(timeStr, sizeof(timeStr), "%dm %ds", mins, (int)state.stats.totalPlayTime % 60);
+            
+            char buf[32];
+            snprintf(buf, sizeof(buf), "%d", state.stats.gamesPlayed);
+            drawStatRow(Loc::Stats_GamesPlayed(), buf);
+            snprintf(buf, sizeof(buf), "%d", state.stats.bestScore);
+            drawStatRow(Loc::Stats_BestScore(), buf, Color{255, 200, 80, 255});
+            snprintf(buf, sizeof(buf), "%d", state.stats.totalScore);
+            drawStatRow(Loc::Stats_TotalScore(), buf);
+            snprintf(buf, sizeof(buf), "%d", state.stats.totalCoinsCollected);
+            drawStatRow(Loc::Stats_CoinsCollected(), buf, Color{255, 215, 0, 255});
+            snprintf(buf, sizeof(buf), "x%d", state.stats.bestCombo);
+            drawStatRow(Loc::Stats_BestCombo(), buf, Color{200, 150, 255, 255});
+            snprintf(buf, sizeof(buf), "%d", state.stats.totalPlatformsLanded);
+            drawStatRow(Loc::Stats_PlatformsLanded(), buf);
+            snprintf(buf, sizeof(buf), "%d", state.stats.bestPlatformStreak);
+            drawStatRow(Loc::Stats_BestStreak(), buf);
+            snprintf(buf, sizeof(buf), "%d", state.stats.totalPowerUpsCollected);
+            drawStatRow(Loc::Stats_PowerUps(), buf);
+            snprintf(buf, sizeof(buf), "%d", state.stats.totalJumps);
+            drawStatRow(Loc::Stats_TotalJumps(), buf);
+            snprintf(buf, sizeof(buf), "%d", state.stats.deaths);
+            drawStatRow(Loc::Stats_Deaths(), buf, Color{255, 120, 120, 255});
+            snprintf(buf, sizeof(buf), "%d", state.stats.revives);
+            drawStatRow(Loc::Stats_Revives(), buf, Color{120, 255, 120, 255});
+            drawStatRow(Loc::Stats_PlayTime(), timeStr, Color{150, 200, 255, 255});
+        }
+    }
     
     ApplyMenuAudioVolumes();
     
@@ -455,7 +591,7 @@ void Game::DrawMenu(){
     DrawText(Loc::Settings_TabHint(), (int)(uiCenterX - S(70)), sh - S(35), S(11), Color{70,70,90,255});
     
     if(IsKeyPressed(KEY_TAB)) {
-        menuTab = (menuTab + 1) % 5;
+        menuTab = (menuTab + 1) % 6;
     }
     
     EndDrawing();
