@@ -351,6 +351,8 @@ void Game::ApplyThemeIfNeeded(){
     int stage = state.generatedPlatformsCount / PLATFORMS_PER_THEME;
     int nextTheme = stage % (int)state.themes.size();
     if(nextTheme != state.currentThemeIndex){
+        state.prevTheme = state.currentTheme;
+        state.themeBlend = 0.f;
         state.currentThemeIndex = nextTheme;
         state.currentTheme = state.themes[state.currentThemeIndex];
         state.themeChangeTimer = 3.f;
@@ -493,6 +495,7 @@ void Game::UpdateGameplay(float dt){
     
     if(state.shieldFlashAlpha > 0) state.shieldFlashAlpha -= dt * 4.f;
     if(state.doubleJumpEffectTimer > 0) state.doubleJumpEffectTimer -= dt;
+    if(state.themeBlend < 1.f) { state.themeBlend += dt * 0.8f; if(state.themeBlend > 1.f) state.themeBlend = 1.f; }
     
     UpdateGamepadState(state.gamepad);
     

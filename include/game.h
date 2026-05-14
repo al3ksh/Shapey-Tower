@@ -109,6 +109,7 @@ struct GameState {
     TutorialState tutorial;
     GamepadState gamepad;
     GameStats stats;
+    Leaderboard leaderboard;
     int currentRunPlatforms = 0;
     int currentRunJumps = 0;
     int currentRunPowerUps = 0;
@@ -116,7 +117,8 @@ struct GameState {
     bool wallSlidingLeft = false;
     bool wallSlidingRight = false;
     float wallSlideGravity = 200.f;
-    Leaderboard leaderboard;
+    float themeBlend = 1.f;
+    Theme prevTheme{};
 };
 
 struct GameConfig {
@@ -224,4 +226,6 @@ private:
     void DrawGameWorld(float dt);
     void DrawHud(float dt);
     void DrawGameOverOverlay();
+    void DrawBiomeEffects(int w, int h, float cameraY, float time);
+    void DrawBiomeBackground(int w, int h, float cameraY, float time, int biome, Color tint);
 };
