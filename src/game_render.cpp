@@ -280,12 +280,33 @@ void Game::DrawGameWorld(float dt) {
     Particles::Draw(state.particles);
 
     if (state.playerTexture.id > 0) {
-        Rectangle src{0, 0, (float)state.playerTexture.width, (float)state.playerTexture.height};
+        Texture2D playerTex = state.playerTexture;
+        float pvx = state.player.vel.x;
+        if (pvx < -10.f) state.playerFacingLeft = true;
+        else if (pvx > 10.f) state.playerFacingLeft = false;
+        if (state.playerFrames.size() >= 9) {
+            enum { IDLE = 0, RUN = 2, JUMP = 6, FALL = 7, WALL = 8 };
+            int frame;
+            if (state.wallSlidingLeft || state.wallSlidingRight) {
+                frame = WALL;
+                state.playerFacingLeft = state.wallSlidingLeft;
+            } else if (!state.onGround) {
+                frame = state.player.vel.y < 0.f ? JUMP : FALL;
+            } else if (std::fabs(pvx) > 40.f) {
+                state.runAnimTime += dt * (6.f + 8.f * std::fabs(pvx) / cfg.MAX_HSPEED);
+                frame = RUN + (int)state.runAnimTime % 4;
+            } else {
+                state.runAnimTime = 0.f;
+                frame = IDLE + (int)(state.animTime * 2.f) % 2;
+            }
+            playerTex = state.playerFrames[frame];
+        }
+        Rectangle src{0, 0, (float)playerTex.width, (float)playerTex.height};
         float baseScale = state.playerSpriteScale;
         float dstW = state.player.width * baseScale;
         float dstH = state.player.height * baseScale;
-        float padRatio = (state.playerTexture.height > 0)
-                             ? (state.playerSpriteBottomPad / (float)state.playerTexture.height)
+        float padRatio = (playerTex.height > 0)
+                             ? (state.playerSpriteBottomPad / (float)playerTex.height)
                              : 0.f;
         float vx = state.player.vel.x;
         float lean = vx / cfg.MAX_HSPEED;
@@ -310,7 +331,7 @@ void Game::DrawGameWorld(float dt) {
             state.player.pos.y - (dstH - state.player.height) + state.playerSpriteYOffset + padRatio * dstH;
         float dstY = baseY - (finalH - dstH);
         Rectangle dst{dstX, dstY, finalW, finalH};
-        if (vx < -10.f) src.width = -src.width;
+        if (state.playerFacingLeft) src.width = -src.width;
         constexpr int MIN_COMBO = Const::COMBO_MIN_MULT;
         bool comboActive = (settings.comboEffects && state.comboCount >= MIN_COMBO &&
                             state.comboTimer > 0 && state.shaderFire.id > 0);
@@ -318,7 +339,7 @@ void Game::DrawGameWorld(float dt) {
             float intensity = std::fmin(1.f, (float)(state.comboCount - 1) / 6.f);
             float pulse = (std::sin(state.animTime * 5.f) + 1.f) * 0.5f;
             float finalIntensity = (0.5f + 0.5f * pulse) * intensity;
-            Vector2 sprSize{(float)state.playerTexture.width, (float)state.playerTexture.height};
+            Vector2 sprSize{(float)playerTex.width, (float)playerTex.height};
             BeginBlendMode(BLEND_ADDITIVE);
             BeginShaderMode(state.shaderFire);
             if (state.fireLocTime >= 0)
@@ -336,7 +357,7 @@ void Game::DrawGameWorld(float dt) {
             aura.y -= aura.height * Const::AURA_OFFSET_Y;
             aura.width *= Const::AURA_GROW_W;
             aura.height *= Const::AURA_GROW_H;
-            DrawTexturePro(state.playerTexture, src, aura, {0, 0}, leanDeg, WHITE);
+            DrawTexturePro(playerTex, src, aura, {0, 0}, leanDeg, WHITE);
             EndShaderMode();
             EndBlendMode();
             BeginShaderMode(state.shaderFire);
@@ -350,10 +371,10 @@ void Game::DrawGameWorld(float dt) {
                 int mode = 0;
                 SetShaderValue(state.shaderFire, state.fireLocMode, &mode, SHADER_UNIFORM_INT);
             }
-            DrawTexturePro(state.playerTexture, src, dst, {0, 0}, leanDeg, WHITE);
+            DrawTexturePro(playerTex, src, dst, {0, 0}, leanDeg, WHITE);
             EndShaderMode();
         } else
-            DrawTexturePro(state.playerTexture, src, dst, {0, 0}, leanDeg, WHITE);
+            DrawTexturePro(playerTex, src, dst, {0, 0}, leanDeg, WHITE);
     } else {
         DrawRectangle((int)state.player.pos.x, (int)state.player.pos.y, (int)state.player.width,
                        (int)state.player.height, blended.playerBody);

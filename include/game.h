@@ -52,6 +52,9 @@ struct GameState {
     bool onGround=false; bool onIce=false; float coyoteTimer=0.f; float jumpBufferTimer=0.f;
     GameAudio audio;
     Texture2D playerTexture{};
+    std::vector<Texture2D> playerFrames;
+    bool playerFacingLeft = false;
+    float runAnimTime = 0.f;
     float playerSpriteScale = 1.8f;
     float playerSpriteYOffset = 0.f;
     float playerSpriteBottomPad = 0.f;
@@ -171,6 +174,7 @@ private:
     void AutoSaveSettings(float dt);
     void ResetSettingsToDefaults();
     void ResetGame();
+    void SaveProgress();
     void RevivePlayer();
     void UpdateGameplay(float dt);
     void DrawMenu();
@@ -184,7 +188,6 @@ private:
     void SpawnOnePlatform(float y);
     void ApplyThemeIfNeeded();
     void DrawResolutionSelector(int &y, float uiCenterX, Vector2 mPos, bool click, int sw, float scale = 1.0f);
-    void DrawAudioSliders(int &y, float uiCenterX, Vector2 mPos, int sw, bool &changedOut);
     void ApplyAudioVolumes();
     void ApplyMenuAudioVolumes();
     template<typename RebindEnum>
@@ -212,16 +215,6 @@ private:
         int tw=MeasureText(label,20); DrawText(label,bx + w/2 - tw/2,y+ (h-20)/2,20,RAYWHITE);
         if(hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) pressedOut=true; else pressedOut=false;
         y += h + UiLayout::ButtonGap; return rc;
-    }
-    void GuiVolumeSlider(float centerX, int &y, const char* name, float &val, Vector2 mouse, int clampLeft, int clampRight, bool &changed){
-        int w=320, h=24; int x=(int)(centerX - w/2); if(x<clampLeft) x=clampLeft; if(x+w>clampRight) x=clampRight-w; Rectangle bar{(float)x,(float)y,(float)w,(float)h};
-        DrawRectangleRec(bar,Color{40,50,70,255}); DrawRectangleLines(x,y,w,h,RAYWHITE);
-        float knobX = x + val * (w-10); Rectangle knob{knobX,(float)y,10.f,(float)h}; DrawRectangleRec(knob,Color{150,180,240,255});
-        DrawText(name,x+5,y+4,16,RAYWHITE);
-        if(IsMouseButtonDown(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(mouse,bar)){
-            float nv = (mouse.x - x)/(float)w; if(nv<0) nv=0; if(nv>1) nv=1; if(std::fabs(nv-val)>0.0001f){ val=nv; changed=true; }
-        }
-        y += h + UiLayout::SliderGap;
     }
     void DrawGameWorld(float dt);
     void DrawHud(float dt);

@@ -78,8 +78,39 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
     state.camera.zoom=1.f;
     state.cameraTopY=state.camera.target.y;
     state.currentScreen = GameState::Screen::MENU;
+    const char* sheetPaths[] = {"assets/textures/player_sheet.png","player_sheet.png"};
+    for(const char* p: sheetPaths){
+        if(!FileExists(p)) continue;
+        Image sheet = LoadImage(p);
+        if(sheet.data && sheet.height > 0){
+            int frameW = sheet.height * 32 / 40;
+            int count = sheet.width / frameW;
+            for(int i=0;i<count;i++){
+                Image frame = ImageFromImage(sheet, Rectangle{(float)(i*frameW),0,(float)frameW,(float)sheet.height});
+                Texture2D tex = LoadTextureFromImage(frame);
+                SetTextureFilter(tex, TEXTURE_FILTER_POINT);
+                state.playerFrames.push_back(tex);
+                if(i==0){
+                    int bottomPad=0;
+                    for(int y=frame.height-1; y>=0; --y){
+                        bool opaque=false;
+                        for(int x=0;x<frame.width && !opaque;++x) opaque = GetImageColor(frame,x,y).a>10;
+                        if(opaque){ bottomPad = frame.height-1-y; break; }
+                    }
+                    state.playerSpriteBottomPad = (float)bottomPad;
+                }
+                UnloadImage(frame);
+            }
+            state.playerTexture = state.playerFrames.empty() ? Texture2D{} : state.playerFrames[0];
+            state.playerSpriteScale = 2.f; // integer pixel scale: 32x40 frame -> 64x80
+            LOG_INFO("Loaded player sheet '%s' (%d frames)", p, count);
+        }
+        UnloadImage(sheet);
+        break;
+    }
     const char* playerTexPaths[] = {"assets/textures/model.png","model.png"};
     for(const char* p: playerTexPaths){
+        if(!state.playerFrames.empty()) break;
         if(FileExists(p)){
             state.playerTexture = LoadTexture(p);
             Image img = LoadImage(p);
@@ -154,18 +185,8 @@ Game::~Game(){
     settings.keyJump = state.keys.jump;
 
     SaveSettings("settings.cfg", settings);
-    SaveHighScore("highscore.txt", state.highScore);
-    SaveStats("stats.txt", state.stats);
-    SaveLeaderboard("leaderboard.txt", state.leaderboard);
-    
-    {
-        std::vector<std::string> unlocked;
-        for (auto &ach : state.achievements) {
-            if (ach.unlocked) unlocked.push_back(ach.id);
-        }
-        SaveUnlockedAchievements("achievements.txt", unlocked);
-    }
-    
+    SaveProgress();
+
     if(state.dailyChallenge.bestScore > 0) {
         SaveDailyHighScore("daily_highscore.txt", 
             state.dailyChallenge.year, state.dailyChallenge.month, state.dailyChallenge.day,
@@ -173,11 +194,24 @@ Game::~Game(){
     }
     
     UnloadGameAudio(state.audio);
-    if(state.playerTexture.id>0) UnloadTexture(state.playerTexture);
+    if(!state.playerFrames.empty()){ for(auto &t: state.playerFrames) UnloadTexture(t); }
+    else if(state.playerTexture.id>0) UnloadTexture(state.playerTexture);
     if(state.shaderFire.id>0) UnloadShader(state.shaderFire);
     if(gameRT.id>0) UnloadRenderTexture(gameRT);
     CloseAudioDevice();
     CloseWindow();
+}
+
+void Game::SaveProgress(){
+    if(state.score > state.highScore) state.highScore = state.score;
+    SaveHighScore("highscore.txt", state.highScore);
+    SaveStats("stats.txt", state.stats);
+    SaveLeaderboard("leaderboard.txt", state.leaderboard);
+    std::vector<std::string> unlocked;
+    for (auto &ach : state.achievements) {
+        if (ach.unlocked) unlocked.push_back(ach.id);
+    }
+    SaveUnlockedAchievements("achievements.txt", unlocked);
 }
 
 void Game::ApplyResolution(bool recenterCamera){
@@ -440,7 +474,13 @@ void Game::Update(){
     if(IsKeyPressed(KEY_ESCAPE) || state.gamepad.startPressed || state.gamepad.backPressed){
         switch(state.currentScreen){
             case GameState::Screen::MENU: running=false; break;
-            case GameState::Screen::GAME: ChangeScreen(GameState::Screen::PAUSE); break;
+            case GameState::Screen::GAME:
+                if(IsTutorialActive(state.tutorial)){
+                    state.tutorial.currentStep = TutorialStep::DONE;
+                    state.tutorial.active = false;
+                    SaveTutorialDone("tutorial_done.txt");
+                } else ChangeScreen(GameState::Screen::PAUSE);
+                break;
             case GameState::Screen::PAUSE: ChangeScreen(GameState::Screen::GAME); break;
             case GameState::Screen::GAMEOVER: ChangeScreen(GameState::Screen::MENU); break;
             case GameState::Screen::REVIVE_PROMPT: ChangeScreen(GameState::Screen::GAMEOVER, false); break;
@@ -482,12 +522,6 @@ void Game::UpdateGameplay(float dt){
         ChangeScreen(GameState::Screen::GAMEOVER,false); 
     }
     
-    if(IsTutorialActive(state.tutorial) && IsKeyPressed(KEY_ESCAPE)) {
-        state.tutorial.currentStep = TutorialStep::DONE;
-        state.tutorial.active = false;
-        SaveTutorialDone("tutorial_done.txt");
-    }
-    
     float effectiveDt = dt * state.slowMotionFactor;
     
     state.animTime += dt;
@@ -496,8 +530,6 @@ void Game::UpdateGameplay(float dt){
     if(state.shieldFlashAlpha > 0) state.shieldFlashAlpha -= dt * 4.f;
     if(state.doubleJumpEffectTimer > 0) state.doubleJumpEffectTimer -= dt;
     if(state.themeBlend < 1.f) { state.themeBlend += dt * 0.8f; if(state.themeBlend > 1.f) state.themeBlend = 1.f; }
-    
-    UpdateGamepadState(state.gamepad);
     
     for (auto it = state.activePowerUps.begin(); it != state.activePowerUps.end();) {
         it->timeRemaining -= dt;
@@ -714,7 +746,7 @@ void Game::UpdateGameplay(float dt){
     if(state.powerUpTimers[3] <= 0) { state.activeMagnet = false; state.coinMagnetRange = 0.f; }
     
     for(auto& ach : state.achievements) {
-        if(!ach.unlocked && ach.condition(state.score, state.comboCount, state.globalCoins, state.generatedPlatformsCount)) {
+        if(!ach.unlocked && ach.condition(state.score, state.comboCount, state.globalCoins, state.currentRunPlatforms)) {
             ach.unlocked = true;
             state.lastUnlockedAchievement = ach.name;
             state.achievementPopupTimer = 3.f;
@@ -770,6 +802,7 @@ void Game::UpdateGameplay(float dt){
             state.stats.totalJumps += state.currentRunJumps;
             state.stats.deaths++;
             AddLeaderboardEntry(state.leaderboard, {state.score, state.sessionCoins, state.currentRunBestCombo, state.isDailyRun});
+            SaveProgress();
             if(state.audio.musicBg.ctxData){ PauseMusicStream(state.audio.musicBg); state.musicPausedOnDeath=true; } 
             if(state.audio.sndDeath.frameCount>0){ SetSoundVolume(state.audio.sndDeath, state.audio.volDeath * VOL_DEATH_MULT * VOLUME_SCALE); PlaySound(state.audio.sndDeath);}
             
@@ -887,19 +920,4 @@ void Game::ApplyMenuAudioVolumes(){
     if(state.audio.musicBg.ctxData) {
         SetMusicVolume(state.audio.musicBg, state.audio.volMusic * VOL_MUSIC_MULT);
     }
-}
-
-void Game::DrawAudioSliders(int &y, float uiCenterX, Vector2 mPos, int sw, bool &changedOut){
-    struct AudioSliderSpec { const char* name; float GameAudio::* member; };
-    static constexpr AudioSliderSpec specs[] = {
-        {"Master", &GameAudio::masterSlider},
-    {"Music", &GameAudio::volMusic},
-    {"Jump", &GameAudio::volJump},
-    {"Bounce", &GameAudio::volBounce},
-    {"Death", &GameAudio::volDeath},
-    {"Theme", &GameAudio::volThemeChange}
-    };
-    bool changedLocal=false;
-    for(auto &s: specs){ float &ref = state.audio.*(s.member); GuiVolumeSlider(uiCenterX, y, s.name, ref, mPos, 10, sw-10, changedLocal); }
-    if(changedLocal) changedOut=true;
 }
