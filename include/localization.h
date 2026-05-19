@@ -153,6 +153,12 @@ const char* Tutorial_Optional();
 const char* Tutorial_Skip();
 
 const char* Tab_Stats();
+const char* Tab_Hero();
+const char* Hero_Title();
+const char* Hero_Equip();
+const char* Hero_Equipped();
+const char* Hero_Buy();
+const char* Hero_NotEnough();
 const char* Stats_GamesPlayed();
 const char* Stats_BestScore();
 const char* Stats_TotalScore();

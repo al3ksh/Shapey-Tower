@@ -45,3 +45,5 @@ Thumbs.db
 # Temporary
 .TODO.txt
 todo.txt
+# Python
+__pycache__/

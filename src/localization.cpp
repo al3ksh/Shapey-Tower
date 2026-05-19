@@ -157,6 +157,12 @@ const char* Loc::Tutorial_Optional() { return LOC("(skip in a moment)", "(pomini
 const char* Loc::Tutorial_Skip() { return LOC("[ESC] skip tutorial", "[ESC] pomin samouczek"); }
 
 const char* Loc::Tab_Stats() { return LOC("STATS", "STATY"); }
+const char* Loc::Tab_Hero() { return LOC("HERO", "POSTAC"); }
+const char* Loc::Hero_Title() { return LOC("Choose your climber", "Wybierz postac"); }
+const char* Loc::Hero_Equip() { return LOC("EQUIP", "WYBIERZ"); }
+const char* Loc::Hero_Equipped() { return LOC("EQUIPPED", "WYBRANA"); }
+const char* Loc::Hero_Buy() { return LOC("BUY", "KUP"); }
+const char* Loc::Hero_NotEnough() { return LOC("Not enough coins", "Za malo monet"); }
 const char* Loc::Stats_GamesPlayed() { return LOC("Games Played", "Gry rozegrane"); }
 const char* Loc::Stats_BestScore() { return LOC("Best Score", "Najlepszy wynik"); }
 const char* Loc::Stats_TotalScore() { return LOC("Total Score", "Suma wynikow"); }

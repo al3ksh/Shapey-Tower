@@ -22,6 +22,7 @@ struct Platform {
     float alpha = 1.f;
     bool visible = true;
     float crumbleProgress = 0.f;
+    int biome = 0; // biome the platform was spawned in (selects its tile art)
 };
 
 void UpdateMovingPlatforms(std::vector<Platform> &platforms);

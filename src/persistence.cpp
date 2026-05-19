@@ -100,3 +100,19 @@ void SaveUnlockedAchievements(const std::string &path, const std::vector<std::st
     if (!ofs) return;
     for (auto &id : ids) ofs << id << "\n";
 }
+
+#include "skins.h"
+
+SkinState LoadSkins(const std::string &path){
+    SkinState s;
+    std::ifstream in(path);
+    if(in){ in >> s.selected >> s.owned; }
+    s.owned |= 1u;
+    if(s.selected < 0 || s.selected >= SKIN_COUNT || !s.Owns(s.selected)) s.selected = 0;
+    return s;
+}
+
+void SaveSkins(const std::string &path, const SkinState &s){
+    std::ofstream out(path);
+    if(out) out << s.selected << ' ' << s.owned << '\n';
+}

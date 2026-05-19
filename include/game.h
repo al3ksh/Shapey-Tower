@@ -22,6 +22,8 @@
 #include "tutorial.h"
 #include "stats.h"
 #include "leaderboard.h"
+#include "world_art.h"
+#include "skins.h"
 
 namespace UiLayout {
     inline constexpr int ButtonGap = 18;
@@ -37,6 +39,7 @@ struct GameState {
     std::vector<Platform> platforms;
     std::vector<Theme> themes;
     int currentThemeIndex = 0;
+    int prevThemeIndex = 0;
     Theme currentTheme{};
     int generatedPlatformsCount = 0;
     float themeChangeTimer = 0.f;
@@ -52,7 +55,13 @@ struct GameState {
     bool onGround=false; bool onIce=false; float coyoteTimer=0.f; float jumpBufferTimer=0.f;
     GameAudio audio;
     Texture2D playerTexture{};
-    std::vector<Texture2D> playerFrames;
+    std::vector<Texture2D> playerFrames;   // skin-major: [skin * playerFramesPerSkin + frame]
+    int playerFramesPerSkin = 0;
+    int playerSkinRows = 0;
+    SkinState skins;
+    bool dying = false;          // death animation playing before the game-over/revive screen
+    float dyingTimer = 0.f;
+    float dyingSpin = 0.f;
     bool playerFacingLeft = false;
     float runAnimTime = 0.f;
     float playerSpriteScale = 1.8f;
@@ -155,6 +164,7 @@ private:
     static constexpr int RESOLUTION_COUNT = Video::RESOLUTION_COUNT;
     GameConfig cfg;
     GameState state;
+    WorldArt::Assets worldArt;
     GameSettings settings;
     bool running=true;
     RenderTexture2D gameRT{};
@@ -176,6 +186,8 @@ private:
     void ResetGame();
     void SaveProgress();
     void RevivePlayer();
+    void StartDying();
+    void FinishDying();
     void UpdateGameplay(float dt);
     void DrawMenu();
     void DrawPause();
@@ -217,8 +229,14 @@ private:
         y += h + UiLayout::ButtonGap; return rc;
     }
     void DrawGameWorld(float dt);
+    Texture2D PlayerFrame(int skin, int frame) const {
+        if(state.playerFramesPerSkin <= 0) return state.playerTexture;
+        if(skin < 0 || skin >= state.playerSkinRows) skin = 0;
+        return state.playerFrames[skin * state.playerFramesPerSkin + frame];
+    }
+    void DrawPlayerPreview(Vector2 feet, float scale, int skin, float time, bool running);
+    void DrawHeroTab(int &y, float uiCenterX, Vector2 mPos, bool click);
     void DrawHud(float dt);
     void DrawGameOverOverlay();
     void DrawBiomeEffects(int w, int h, float cameraY, float time);
-    void DrawBiomeBackground(int w, int h, float cameraY, float time, int biome, Color tint);
 };

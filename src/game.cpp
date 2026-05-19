@@ -67,10 +67,12 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
     LoadGameAudio(state.audio);
     state.themes = GetThemes();
     state.currentThemeIndex=0; state.currentTheme=state.themes[0];
+    WorldArt::Load(worldArt, state.themes);
     state.player = Player{ {cfg.gameWidth/2.f-16.f, cfg.gameHeight-120.f},{0,0},32.f,40.f };
     state.platforms.push_back({Rectangle{0,(float)cfg.gameHeight-60.f,(float)cfg.gameWidth,20.f}});
     state.highScore = LoadHighScore("highscore.txt");
     state.globalCoins = LoadGlobalCoins("coins.txt");
+    state.skins = LoadSkins("skins.txt");
 
     float currentY=state.platforms[0].rect.y-100.f; for(int i=0;i<15;i++){ float gap=state.currentTheme.gapMin+state.rng.nextInt((int)(state.currentTheme.gapMax-state.currentTheme.gapMin+1)); currentY-=gap; SpawnOnePlatform(currentY);} state.highestPlatformY=currentY;
     state.camera.target={ (float)cfg.gameWidth/2, state.player.pos.y+state.player.height/2};
@@ -83,10 +85,14 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
         if(!FileExists(p)) continue;
         Image sheet = LoadImage(p);
         if(sheet.data && sheet.height > 0){
-            int frameW = sheet.height * 32 / 40;
+            const int frameW = 32, frameH = 40;
             int count = sheet.width / frameW;
-            for(int i=0;i<count;i++){
-                Image frame = ImageFromImage(sheet, Rectangle{(float)(i*frameW),0,(float)frameW,(float)sheet.height});
+            int rows = sheet.height / frameH;
+            state.playerFramesPerSkin = count;
+            state.playerSkinRows = rows;
+            for(int i=0;i<count*rows;i++){
+                int fx = i % count, fy = i / count;
+                Image frame = ImageFromImage(sheet, Rectangle{(float)(fx*frameW),(float)(fy*frameH),(float)frameW,(float)frameH});
                 Texture2D tex = LoadTextureFromImage(frame);
                 SetTextureFilter(tex, TEXTURE_FILTER_POINT);
                 state.playerFrames.push_back(tex);
@@ -103,7 +109,7 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
             }
             state.playerTexture = state.playerFrames.empty() ? Texture2D{} : state.playerFrames[0];
             state.playerSpriteScale = 2.f; // integer pixel scale: 32x40 frame -> 64x80
-            LOG_INFO("Loaded player sheet '%s' (%d frames)", p, count);
+            LOG_INFO("Loaded player sheet '%s' (%d frames x %d skins)", p, count, rows);
         }
         UnloadImage(sheet);
         break;
@@ -196,6 +202,7 @@ Game::~Game(){
     UnloadGameAudio(state.audio);
     if(!state.playerFrames.empty()){ for(auto &t: state.playerFrames) UnloadTexture(t); }
     else if(state.playerTexture.id>0) UnloadTexture(state.playerTexture);
+    WorldArt::Unload(worldArt);
     if(state.shaderFire.id>0) UnloadShader(state.shaderFire);
     if(gameRT.id>0) UnloadRenderTexture(gameRT);
     CloseAudioDevice();
@@ -277,6 +284,7 @@ void Game::ResetGame(){
         dailyMods = GetChallengeModifiers(state.dailyChallenge.type);
     }
     
+    state.dying=false; state.dyingTimer=0.f;
     state.score=0; state.comboTimer=0.f; state.comboCount=0; state.lastLandedPlatformIndex=0; state.gameOver=false; state.platforms.clear();
     state.coins.clear(); state.powerups.clear(); state.activePowerUps.clear();
     state.sessionCoins = 0;
@@ -296,7 +304,7 @@ void Game::ResetGame(){
     state.platforms.push_back({Rectangle{0,(float)cfg.gameHeight-60.f,(float)cfg.gameWidth,20.f}});
     state.player.pos = {cfg.gameWidth/2.f - state.player.width/2, state.platforms[0].rect.y - state.player.height};
     state.player.vel={0,0};
-    state.currentThemeIndex=0; state.currentTheme=state.themes[0]; state.themeChangeTimer=2.f; state.generatedPlatformsCount=1; state.lastScoredPlatformIndex=-1; state.lastLandY=state.platforms[0].rect.y;
+    state.currentThemeIndex=0; state.prevThemeIndex=0; state.themeBlend=1.f; state.currentTheme=state.themes[0]; state.themeChangeTimer=2.f; state.generatedPlatformsCount=1; state.lastScoredPlatformIndex=-1; state.lastLandY=state.platforms[0].rect.y;
     
     float gapMult = diffSettings.gapMultiplier;
     float currentY2=state.platforms[0].rect.y-100.f; 
@@ -326,6 +334,7 @@ void Game::RevivePlayer(){
     SaveGlobalCoins("coins.txt", state.globalCoins);
     state.hasRevivedThisRun = true;
     state.gameOver = false;
+    state.dying = false;
     state.stats.revives++;
     
     float safeY = state.cameraTopY + cfg.gameHeight * 0.3f;
@@ -386,6 +395,7 @@ void Game::ApplyThemeIfNeeded(){
     int nextTheme = stage % (int)state.themes.size();
     if(nextTheme != state.currentThemeIndex){
         state.prevTheme = state.currentTheme;
+        state.prevThemeIndex = state.currentThemeIndex;
         state.themeBlend = 0.f;
         state.currentThemeIndex = nextTheme;
         state.currentTheme = state.themes[state.currentThemeIndex];
@@ -407,6 +417,7 @@ void Game::SpawnOnePlatform(float y){
     if(w < 50) w = 50;
     float x = (float)(state.rng.nextInt((int)(cfg.gameWidth - (int)w)));
     Platform p; p.rect = {x, y, w, 18.f};
+    p.biome = state.currentTheme.biomeType;
 
     if(state.isDailyRun){
         if(dailyMods.allIce) p.type = PlatformType::ICE;
@@ -522,6 +533,21 @@ void Game::UpdateGameplay(float dt){
         ChangeScreen(GameState::Screen::GAMEOVER,false); 
     }
     
+    if(state.dying){
+        // Ragdoll pop-up and fall; the world keeps animating but nothing else updates.
+        state.animTime += dt;
+        state.dyingTimer += dt;
+        state.dyingSpin += dt * (state.playerFacingLeft ? -540.f : 540.f);
+        state.player.vel.y += cfg.GRAVITY * dt;
+        state.player.pos.x += state.player.vel.x * dt;
+        state.player.pos.y += state.player.vel.y * dt;
+        UpdateShake(state.screenShake, dt);
+        if(state.shieldFlashAlpha > 0) state.shieldFlashAlpha -= dt * 3.f;
+        state.camera.target={(float)cfg.gameWidth/2 + state.screenShake.offset.x, state.cameraTopY + state.screenShake.offset.y};
+        if(state.dyingTimer >= 1.1f) FinishDying();
+        return;
+    }
+
     float effectiveDt = dt * state.slowMotionFactor;
     
     state.animTime += dt;
@@ -551,7 +577,8 @@ void Game::UpdateGameplay(float dt){
     if(state.onGround) { state.coyoteTimer=cfg.COYOTE_TIME; state.doubleJumpUsed = false; }
     else if(state.coyoteTimer>0) state.coyoteTimer-=dt;
     bool wantsJump = (state.jumpBufferTimer>0 && state.coyoteTimer>0);
-    bool wantsDoubleJump = jumpPressed && !state.onGround && state.hasDoubleJump && !state.doubleJumpUsed && state.coyoteTimer <= 0;
+    bool wantsWallJump = jumpPressed && !state.onGround && (state.wallSlidingLeft || state.wallSlidingRight);
+    bool wantsDoubleJump = !wantsWallJump && jumpPressed && !state.onGround && state.hasDoubleJump && !state.doubleJumpUsed && state.coyoteTimer <= 0;
 
     Vector2 prevPos=state.player.pos;
     float currentFriction = state.onIce ? cfg.ICE_FRICTION : cfg.FRICTION;
@@ -629,6 +656,14 @@ void Game::UpdateGameplay(float dt){
         state.landingSquashActive = false;
         state.currentRunJumps++;
         if(state.audio.sndJump.frameCount>0){ SetSoundVolume(state.audio.sndJump, state.audio.volJump * VOL_JUMP_MULT * VOLUME_SCALE); PlaySound(state.audio.sndJump);} 
+    } else if(wantsWallJump) {
+        // Kick off the wall: up and away from it
+        state.player.vel.y = cfg.BASE_JUMP_SPEED * 0.95f;
+        state.player.vel.x = state.wallSlidingLeft ? cfg.MAX_HSPEED * 0.8f : -cfg.MAX_HSPEED * 0.8f;
+        state.jumpBufferTimer = 0.f;
+        state.currentRunJumps++;
+        EmitWallBounceParticles({state.wallSlidingLeft ? 0.f : (float)cfg.gameWidth, state.player.pos.y + state.player.height/2}, 8);
+        if(state.audio.sndJump.frameCount>0){ SetSoundVolume(state.audio.sndJump, state.audio.volJump * VOL_JUMP_MULT * VOLUME_SCALE); PlaySound(state.audio.sndJump);}
     } else if(wantsDoubleJump) {
         state.player.vel.y = cfg.BASE_JUMP_SPEED * 0.85f;
         state.doubleJumpUsed = true;
@@ -657,7 +692,25 @@ void Game::UpdateGameplay(float dt){
         }
     }
 
-    const float restitution=0.95f; const float wallImpulse=80.f; if(state.player.pos.x<0.f){ state.player.pos.x=0.f; if(state.player.vel.x<0){ state.player.vel.x=-state.player.vel.x*restitution + wallImpulse; EmitWallBounceParticles({0.f,state.player.pos.y+state.player.height/2},6); if(state.audio.sndBounce.frameCount>0){ SetSoundVolume(state.audio.sndBounce, state.audio.volBounce*VOLUME_SCALE); PlaySound(state.audio.sndBounce);} } } if(state.player.pos.x+state.player.width>(float)cfg.gameWidth){ state.player.pos.x=(float)cfg.gameWidth-state.player.width; if(state.player.vel.x>0){ state.player.vel.x=-state.player.vel.x*restitution - wallImpulse; EmitWallBounceParticles({(float)cfg.gameWidth,state.player.pos.y+state.player.height/2},6); if(state.audio.sndBounce.frameCount>0){ SetSoundVolume(state.audio.sndBounce, state.audio.volBounce*VOLUME_SCALE); PlaySound(state.audio.sndBounce);} } }
+    const float restitution=0.95f; const float wallImpulse=80.f;
+    // Falling while pushing into a wall = grab it and slide; otherwise bounce off (the classic tower move).
+    bool grabLeft  = !state.onGround && state.player.vel.y > 0.f && dir < -0.3f;
+    bool grabRight = !state.onGround && state.player.vel.y > 0.f && dir >  0.3f;
+    auto playBounce = [&](){ if(state.audio.sndBounce.frameCount>0){ SetSoundVolume(state.audio.sndBounce, state.audio.volBounce*VOLUME_SCALE); PlaySound(state.audio.sndBounce);} };
+    if(state.player.pos.x<0.f){
+        state.player.pos.x=0.f;
+        if(state.player.vel.x<0){
+            if(grabLeft) state.player.vel.x = 0.f;
+            else { state.player.vel.x=-state.player.vel.x*restitution + wallImpulse; EmitWallBounceParticles({0.f,state.player.pos.y+state.player.height/2},6); playBounce(); }
+        }
+    }
+    if(state.player.pos.x+state.player.width>(float)cfg.gameWidth){
+        state.player.pos.x=(float)cfg.gameWidth-state.player.width;
+        if(state.player.vel.x>0){
+            if(grabRight) state.player.vel.x = 0.f;
+            else { state.player.vel.x=-state.player.vel.x*restitution - wallImpulse; EmitWallBounceParticles({(float)cfg.gameWidth,state.player.pos.y+state.player.height/2},6); playBounce(); }
+        }
+    }
 
     UpdateMovingPlatforms(state.platforms);
     UpdatePlatformStates(state.platforms, effectiveDt);
@@ -785,34 +838,49 @@ void Game::UpdateGameplay(float dt){
             state.activePowerUps.erase(std::remove_if(state.activePowerUps.begin(), state.activePowerUps.end(), 
                 [](const ActivePowerUp& p){ return p.type == PowerUpType::SHIELD; }), state.activePowerUps.end());
             if(settings.screenShake) TriggerShake(state.screenShake, 8.f, 0.3f);
-        } else if(!state.gameOver){ 
-            state.gameOver=true; 
-            if(settings.screenShake) TriggerShake(state.screenShake, 10.f, 0.5f);
-            if(state.isDailyRun && state.score > state.dailyChallenge.bestScore) {
-                state.dailyChallenge.bestScore = state.score;
-            }
-            state.stats.gamesPlayed++;
-            state.stats.totalScore += state.score;
-            if(state.score > state.stats.bestScore) state.stats.bestScore = state.score;
-            state.stats.totalCoinsCollected += state.sessionCoins;
-            if(state.currentRunBestCombo > state.stats.bestCombo) state.stats.bestCombo = state.currentRunBestCombo;
-            state.stats.totalPlatformsLanded += state.currentRunPlatforms;
-            if(state.currentRunPlatforms > state.stats.bestPlatformStreak) state.stats.bestPlatformStreak = state.currentRunPlatforms;
-            state.stats.totalPowerUpsCollected += state.currentRunPowerUps;
-            state.stats.totalJumps += state.currentRunJumps;
-            state.stats.deaths++;
-            AddLeaderboardEntry(state.leaderboard, {state.score, state.sessionCoins, state.currentRunBestCombo, state.isDailyRun});
-            SaveProgress();
-            if(state.audio.musicBg.ctxData){ PauseMusicStream(state.audio.musicBg); state.musicPausedOnDeath=true; } 
-            if(state.audio.sndDeath.frameCount>0){ SetSoundVolume(state.audio.sndDeath, state.audio.volDeath * VOL_DEATH_MULT * VOLUME_SCALE); PlaySound(state.audio.sndDeath);}
-            
-            // Check if player can revive - show revive prompt instead of game over
-            bool canRevive = !state.hasRevivedThisRun && state.globalCoins >= state.reviveCost && !state.isDailyRun;
-            if(canRevive) {
-                state.reviveTimer = state.REVIVE_TIME_LIMIT;
-                ChangeScreen(GameState::Screen::REVIVE_PROMPT, false);
-            }
-        } 
+        } else if(!state.gameOver && !state.dying){
+            StartDying();
+        }
+    }
+}
+
+void Game::StartDying(){
+    state.dying = true;
+    state.dyingTimer = 0.f;
+    state.dyingSpin = 0.f;
+    state.wallSlidingLeft = state.wallSlidingRight = false;
+    state.landingSquashActive = false;
+    state.player.vel = {state.playerFacingLeft ? 140.f : -140.f, -620.f};
+    state.shieldFlashAlpha = 0.6f;
+    if(settings.screenShake) TriggerShake(state.screenShake, 10.f, 0.5f);
+    if(state.audio.musicBg.ctxData){ PauseMusicStream(state.audio.musicBg); state.musicPausedOnDeath=true; } 
+    if(state.audio.sndDeath.frameCount>0){ SetSoundVolume(state.audio.sndDeath, state.audio.volDeath * VOL_DEATH_MULT * VOLUME_SCALE); PlaySound(state.audio.sndDeath);}
+}
+
+void Game::FinishDying(){
+    state.dying = false;
+    state.gameOver = true;
+    if(state.isDailyRun && state.score > state.dailyChallenge.bestScore) {
+        state.dailyChallenge.bestScore = state.score;
+    }
+    state.stats.gamesPlayed++;
+    state.stats.totalScore += state.score;
+    if(state.score > state.stats.bestScore) state.stats.bestScore = state.score;
+    state.stats.totalCoinsCollected += state.sessionCoins;
+    if(state.currentRunBestCombo > state.stats.bestCombo) state.stats.bestCombo = state.currentRunBestCombo;
+    state.stats.totalPlatformsLanded += state.currentRunPlatforms;
+    if(state.currentRunPlatforms > state.stats.bestPlatformStreak) state.stats.bestPlatformStreak = state.currentRunPlatforms;
+    state.stats.totalPowerUpsCollected += state.currentRunPowerUps;
+    state.stats.totalJumps += state.currentRunJumps;
+    state.stats.deaths++;
+    AddLeaderboardEntry(state.leaderboard, {state.score, state.sessionCoins, state.currentRunBestCombo, state.isDailyRun});
+    SaveProgress();
+    
+    // Check if player can revive - show revive prompt instead of game over
+    bool canRevive = !state.hasRevivedThisRun && state.globalCoins >= state.reviveCost && !state.isDailyRun;
+    if(canRevive) {
+        state.reviveTimer = state.REVIVE_TIME_LIMIT;
+        ChangeScreen(GameState::Screen::REVIVE_PROMPT, false);
     }
 }
 

@@ -10,6 +10,7 @@
 #include "leaderboard.h"
 #include "stats.h"
 #include <cmath>
+#include <algorithm>
 
 static int menuTab = 0;
 static float uiScale = 1.0f;
@@ -88,15 +89,16 @@ void Game::DrawMenu(){
     DrawText("v1.5", sw - S(45), sh - S(22), S(12), Color{70,70,70,255});
     
     int tabY = S(72);
-    int tabW = S(68), tabH = S(28);
     int tabGap = S(3);
-    float tabStartX = uiCenterX - (6 * tabW + 5*tabGap) / 2.f;
+    int tabW = std::min(S(60), (sw - S(12) - 6 * tabGap) / 7), tabH = S(28);
+    float tabStartX = uiCenterX - (7 * tabW + 6*tabGap) / 2.f;
     if(Ui::DrawTabButton(tabStartX, tabY, tabW, tabH, Loc::Tab_Game(), 0, menuTab, mPos, click, uiScale)) menuTab=0;
     if(Ui::DrawTabButton(tabStartX + (tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Video(), 1, menuTab, mPos, click, uiScale)) menuTab=1;
     if(Ui::DrawTabButton(tabStartX + 2*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Audio(), 2, menuTab, mPos, click, uiScale)) menuTab=2;
     if(Ui::DrawTabButton(tabStartX + 3*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Keys(), 3, menuTab, mPos, click, uiScale)) menuTab=3;
     if(Ui::DrawTabButton(tabStartX + 4*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Effects(), 4, menuTab, mPos, click, uiScale)) menuTab=4;
     if(Ui::DrawTabButton(tabStartX + 5*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Stats(), 5, menuTab, mPos, click, uiScale)) menuTab=5;
+    if(Ui::DrawTabButton(tabStartX + 6*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Hero(), 6, menuTab, mPos, click, uiScale)) menuTab=6;
     
     int contentY = tabY + tabH + S(20);
     int y = contentY;
@@ -390,6 +392,9 @@ void Game::DrawMenu(){
             ResetSettingsToDefaults();
         }
     }
+    else if(menuTab == 6) {
+        DrawHeroTab(y, uiCenterX, mPos, click);
+    }
     else if(menuTab == 5) {
         static int statsSubTab = 0;
         int subW = S(85), subH = S(24);
@@ -591,8 +596,102 @@ void Game::DrawMenu(){
     DrawText(Loc::Settings_TabHint(), (int)(uiCenterX - S(70)), sh - S(35), S(11), Color{70,70,90,255});
     
     if(IsKeyPressed(KEY_TAB)) {
-        menuTab = (menuTab + 1) % 6;
+        menuTab = (menuTab + 1) % 7;
     }
     
     EndDrawing();
+}
+
+void Game::DrawHeroTab(int &y, float uiCenterX, Vector2 mPos, bool click) {
+    static int preview = -1;
+    if(preview < 0) preview = state.skins.selected;
+
+    Ui::DrawSectionHeader(y, uiCenterX, Loc::Hero_Title(), uiScale);
+    y += S(6);
+
+    // Showcase: the hero idles, then runs, on a pixel platform
+    int panelW = S(300), panelH = S(210);
+    Rectangle panel{uiCenterX - panelW/2.f, (float)y, (float)panelW, (float)panelH};
+    DrawRectangleRec(panel, Color{16,22,34,255});
+    DrawRectangleLinesEx(panel, (float)S(2), Color{50,70,100,255});
+    float t = (float)GetTime();
+    bool running = std::fmod(t, 6.f) > 3.f;
+    float px = std::floor(uiCenterX / 2.f) * 2.f;
+    float groundY = std::floor((panel.y + panelH - S(46)) / 2.f) * 2.f;
+    if(worldArt.loaded){
+        float tileW = (float)S(200);
+        WorldArt::DrawPlatform(worldArt, {px - tileW/2.f, groundY, tileW, 18.f}, BIOME_DEFAULT, WHITE);
+    }
+    DrawPlayerPreview({px, groundY}, std::floor(4.f * uiScale), preview, t, running);
+
+    int arrowW = S(34), arrowH = S(60);
+    Rectangle left{panel.x + S(8), panel.y + panelH/2.f - arrowH/2.f, (float)arrowW, (float)arrowH};
+    Rectangle right{panel.x + panelW - S(8) - arrowW, left.y, (float)arrowW, (float)arrowH};
+    auto arrow = [&](Rectangle r, const char* txt){
+        bool hov = CheckCollisionPointRec(mPos, r);
+        DrawRectangleRec(r, hov ? Color{60,90,140,255} : Color{35,45,60,255});
+        int f = S(24); int w = MeasureText(txt, f);
+        DrawText(txt, (int)(r.x + r.width/2 - w/2), (int)(r.y + r.height/2 - f/2), f, RAYWHITE);
+        return hov && click;
+    };
+    if(arrow(left, "<") || IsKeyPressed(KEY_LEFT)) preview = (preview + SKIN_COUNT - 1) % SKIN_COUNT;
+    if(arrow(right, ">") || IsKeyPressed(KEY_RIGHT)) preview = (preview + 1) % SKIN_COUNT;
+    y += panelH + S(10);
+
+    const SkinInfo &info = kSkins[preview];
+    int nameFont = S(24);
+    int nw = MeasureText(info.name, nameFont);
+    DrawText(info.name, (int)(uiCenterX - nw/2), y, nameFont, RAYWHITE);
+    y += nameFont + S(10);
+
+    bool owned = state.skins.Owns(preview);
+    bool equipped = owned && state.skins.selected == preview;
+    char label[64];
+    if(equipped) snprintf(label, sizeof(label), "%s", Loc::Hero_Equipped());
+    else if(owned) snprintf(label, sizeof(label), "%s", Loc::Hero_Equip());
+    else snprintf(label, sizeof(label), "%s  %d", Loc::Hero_Buy(), info.price);
+    bool pressed = false;
+    GuiButtonCentered(uiCenterX, y, S(220), S(40), label, mPos, pressed);
+    if(pressed && !equipped){
+        if(owned){
+            state.skins.selected = preview;
+            SaveSkins("skins.txt", state.skins);
+        } else if(state.globalCoins >= info.price){
+            state.globalCoins -= info.price;
+            state.skins.owned |= (1u << preview);
+            state.skins.selected = preview;
+            SaveGlobalCoins("coins.txt", state.globalCoins);
+            SaveSkins("skins.txt", state.skins);
+            if(state.audio.sndPowerUp.frameCount>0) PlaySound(state.audio.sndPowerUp);
+        }
+    }
+    if(!owned && state.globalCoins < info.price){
+        const char* msg = Loc::Hero_NotEnough();
+        int mf = S(12); int mw = MeasureText(msg, mf);
+        DrawText(msg, (int)(uiCenterX - mw/2), y - S(10), mf, Color{220,110,90,255});
+    }
+    y += S(14);
+
+    // Thumbnail strip of every skin; locked ones are dimmed
+    float thumbScale = 1.5f * uiScale;
+    float cellW = 32.f * thumbScale + S(4);
+    float stripX = uiCenterX - cellW * SKIN_COUNT / 2.f;
+    for(int i = 0; i < SKIN_COUNT; i++){
+        Rectangle cell{stripX + i * cellW, (float)y, cellW - S(4), 40.f * thumbScale + S(4)};
+        bool hov = CheckCollisionPointRec(mPos, cell);
+        Color bg = (i == preview) ? Color{60,120,180,255} : (hov ? Color{45,60,85,255} : Color{28,36,50,255});
+        DrawRectangleRec(cell, bg);
+        if(i == state.skins.selected) DrawRectangleLinesEx(cell, 2.f, Color{255,210,90,255});
+        Texture2D tex = PlayerFrame(i, 0);
+        Color tint = state.skins.Owns(i) ? WHITE : Color{70,70,80,255};
+        DrawTexturePro(tex, {0,0,(float)tex.width,(float)tex.height},
+                       {cell.x + S(2), cell.y + S(2), 32.f * thumbScale, 40.f * thumbScale}, {0,0}, 0.f, tint);
+        if(hov && click) preview = i;
+    }
+    y += (int)(40.f * thumbScale) + S(16);
+
+    int coinFont = S(16);
+    const char* coinsTxt = TextFormat("%s %d", Loc::GameOver_Coins(), state.globalCoins);
+    int cw = MeasureText(coinsTxt, coinFont);
+    DrawText(coinsTxt, (int)(uiCenterX - cw/2), y, coinFont, GOLD);
 }

@@ -9,6 +9,10 @@ Frames (32x40 each, laid out horizontally, character faces right):
   6    jump (rising)
   7    fall
   8    wall slide (hand on the wall to the right)
+  9    hurt / death (X eyes, limbs flung out)
+
+Each row of the sheet is one skin (palette swap), see SKINS - keep the order in
+sync with include/skins.h.
 
 No external dependencies - writes the PNG with zlib + struct.
 Run:  python tools/make_player_sprite.py
@@ -76,7 +80,7 @@ class Frame:
             self.px[y][x] = "K"
 
 
-def draw_head(f, bob):
+def draw_head(f, bob, hurt=False):
     y = 3 + bob
     # hood silhouette
     f.rect(12, y, 8, 1, "H")
@@ -91,6 +95,13 @@ def draw_head(f, bob):
     f.rect(14, y + 10, 7, 1, "M")
     f.rect(13, y + 4, 1, 6, "m")
     f.rect(14, y + 10, 7, 1, "m")
+    if hurt:
+        for ex in (14, 18):  # X eyes
+            f.set(ex, y + 5, "E"); f.set(ex + 2, y + 5, "E")
+            f.set(ex + 1, y + 6, "E")
+            f.set(ex, y + 7, "E"); f.set(ex + 2, y + 7, "E")
+        f.set(20, y + 3, "m"); f.set(19, y + 4, "m")  # crack
+        return
     # triangle eye
     f.set(15, y + 5, "E")
     f.rect(14, y + 6, 3, 1, "E")
@@ -136,7 +147,7 @@ def draw_arm(f, shoulder, hand, back):
     f.rect(hand[0] - 1, hand[1], 3, 2, "G")
 
 
-def make(bob, legs, arms, tail):
+def make(bob, legs, arms, tail, hurt=False):
     f = Frame()
     (bh, bf), (fh, ff) = legs
     (bs, bhd), (fs, fhd) = arms
@@ -145,7 +156,7 @@ def make(bob, legs, arms, tail):
     draw_torso(f, bob)
     draw_leg(f, fh, ff, False)
     draw_scarf(f, bob, tail)
-    draw_head(f, bob)
+    draw_head(f, bob, hurt)
     draw_arm(f, fs, fhd, False)
     f.outline()
     return f
@@ -190,7 +201,37 @@ def frames():
                     ((hipB, (11, 36)), (hipF, (22, 34))),
                     (((12, 18), (9, 24)), ((20, 18), (28, 12))),
                     [(10, 14), (9, 12), (9, 10)]))
+    # hurt: flung like a ragdoll
+    out.append(make(0,
+                    ((hipB, (8, 34)), (hipF, (25, 33))),
+                    (((12, 18), (5, 8)), ((20, 18), (27, 9))),
+                    [(10, 13), (8, 11), (7, 9), (5, 8)], hurt=True))
     return out
+
+
+# name, price in coins, palette overrides (order == Skin ids in include/skins.h)
+SKINS = [
+    ("The Shape", 0, {}),
+    ("Ember", 60, {"O": (220, 52, 40, 255), "o": (138, 24, 20, 255), "S": (48, 44, 46, 255),
+                   "s": (30, 28, 30, 255), "t": (74, 68, 70, 255), "a": (88, 80, 82, 255), "G": (28, 24, 24, 255)}),
+    ("Frost", 120, {"S": (122, 154, 200, 255), "s": (88, 118, 166, 255), "t": (168, 200, 232, 255),
+                    "a": (150, 180, 220, 255), "H": (210, 222, 240, 255), "h": (255, 255, 255, 255),
+                    "O": (90, 220, 255, 255), "o": (40, 140, 200, 255), "G": (230, 240, 255, 255)}),
+    ("Toxic", 180, {"S": (74, 90, 42, 255), "s": (50, 62, 28, 255), "t": (104, 124, 60, 255),
+                    "a": (118, 138, 70, 255), "O": (160, 255, 60, 255), "o": (90, 170, 20, 255),
+                    "M": (220, 236, 190, 255), "m": (170, 190, 140, 255)}),
+    ("Royal", 300, {"S": (74, 40, 110, 255), "s": (48, 24, 76, 255), "t": (110, 70, 150, 255),
+                    "a": (124, 84, 168, 255), "H": (60, 30, 90, 255), "h": (96, 56, 136, 255),
+                    "M": (255, 214, 70, 255), "m": (200, 150, 30, 255), "O": (240, 240, 250, 255),
+                    "o": (170, 170, 190, 255)}),
+    ("Bone", 500, {"S": (30, 30, 34, 255), "s": (18, 18, 22, 255), "t": (52, 52, 60, 255),
+                   "a": (44, 44, 50, 255), "H": (22, 22, 26, 255), "h": (46, 46, 54, 255),
+                   "O": (230, 230, 230, 255), "o": (150, 150, 150, 255), "G": (230, 226, 210, 255)}),
+    ("Glitch", 800, {"S": (26, 22, 44, 255), "s": (16, 12, 30, 255), "t": (60, 40, 110, 255),
+                     "a": (50, 36, 90, 255), "H": (14, 12, 24, 255), "h": (255, 60, 200, 255),
+                     "M": (90, 255, 230, 255), "m": (30, 170, 170, 255), "O": (255, 60, 200, 255),
+                     "o": (150, 20, 120, 255)}),
+]
 
 
 def write_png(path, w, h, rows):
@@ -210,18 +251,20 @@ def write_png(path, w, h, rows):
 
 def main(scale=1, name="player_sheet.png"):
     fs = frames()
-    W, H = FW * len(fs) * scale, FH * scale
+    W, H = FW * len(fs) * scale, FH * len(SKINS) * scale
     rows = []
     for y in range(H):
         row = []
+        skin, fy = divmod(y // scale, FH)
+        pal = dict(PAL, **SKINS[skin][2])
         for x in range(W):
             fi, fx = divmod(x // scale, FW)
-            c = fs[fi].px[y // scale][fx]
-            row.extend(PAL[c] if c else (0, 0, 0, 0))
+            c = fs[fi].px[fy][fx]
+            row.extend(pal[c] if c else (0, 0, 0, 0))
         rows.append(row)
     root = os.path.join(os.path.dirname(__file__), "..", "assets", "textures")
     write_png(os.path.join(root, name), W, H, rows)
-    print(f"wrote {name} ({W}x{H}, {len(fs)} frames)")
+    print(f"wrote {name} ({W}x{H}, {len(fs)} frames x {len(SKINS)} skins)")
 
 
 if __name__ == "__main__":

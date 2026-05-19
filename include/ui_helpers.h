@@ -14,6 +14,7 @@ inline bool DrawTabButton(float x, int y, int w, int h, const char* label, int t
     if(selected) DrawRectangle((int)x, y+h-S(3), w, S(3), Color{100,180,255,255});
     int fontSize = S(13);
     int tw = MeasureText(label, fontSize);
+    while(tw > w - S(6) && fontSize > 8) { fontSize--; tw = MeasureText(label, fontSize); }
     DrawText(label, (int)(x + w/2 - tw/2), y + h/2 - fontSize/2, fontSize, selected ? WHITE : Color{180,180,180,255});
     return click && hovered;
 }
