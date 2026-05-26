@@ -1,6 +1,7 @@
 #include "game.h"
 #include "debug.h"
 #include "tutorial.h"
+#include "ui_helpers.h"
 #include <cstdlib>
 #include <ctime>
 #include <algorithm>
@@ -68,6 +69,7 @@ Game::Game(const GameConfig &cfg):cfg(cfg){
     state.themes = GetThemes();
     state.currentThemeIndex=0; state.currentTheme=state.themes[0];
     WorldArt::Load(worldArt, state.themes);
+    Ui::Init();
     state.player = Player{ {cfg.gameWidth/2.f-16.f, cfg.gameHeight-120.f},{0,0},32.f,40.f };
     state.platforms.push_back({Rectangle{0,(float)cfg.gameHeight-60.f,(float)cfg.gameWidth,20.f}});
     state.highScore = LoadHighScore("highscore.txt");
@@ -203,6 +205,7 @@ Game::~Game(){
     if(!state.playerFrames.empty()){ for(auto &t: state.playerFrames) UnloadTexture(t); }
     else if(state.playerTexture.id>0) UnloadTexture(state.playerTexture);
     WorldArt::Unload(worldArt);
+    Ui::Shutdown();
     if(state.shaderFire.id>0) UnloadShader(state.shaderFire);
     if(gameRT.id>0) UnloadRenderTexture(gameRT);
     CloseAudioDevice();
@@ -285,6 +288,7 @@ void Game::ResetGame(){
     }
     
     state.dying=false; state.dyingTimer=0.f;
+    state.runStartHighScore = state.highScore;
     state.score=0; state.comboTimer=0.f; state.comboCount=0; state.lastLandedPlatformIndex=0; state.gameOver=false; state.platforms.clear();
     state.coins.clear(); state.powerups.clear(); state.activePowerUps.clear();
     state.sessionCoins = 0;
@@ -935,23 +939,21 @@ void Game::UpdateFade(float dt){
 }
 
 void Game::DrawResolutionSelector(int &y, float uiCenterX, Vector2 mPos, bool click, int sw, float scale){
-    auto S = [scale](int v) { return (int)(v * scale); };
-    auto clampX=[&](int desired,int w){ int x=desired; if(x<S(10)) x=S(10); if(x+w>sw-S(10)) x=sw-S(10)-w; return x; };
-    int rw=S(300); int rh=S(34); int rx=clampX((int)(uiCenterX - rw/2),rw);
-    Rectangle resBox{(float)rx,(float)y,(float)rw,(float)rh};
-    DrawRectangleRec(resBox,{40,50,70,255}); DrawRectangleLines(rx,y,rw,rh,RAYWHITE);
-    int arrowW=S(32); Rectangle leftA{(float)(rx+S(4)),(float)(y+S(4)),(float)arrowW,(float)(rh-S(8))}; Rectangle rightA{(float)(rx+rw-arrowW-S(4)),(float)(y+S(4)),(float)arrowW,(float)(rh-S(8))};
-    auto hover=[&](Rectangle r){ return CheckCollisionPointRec(mPos,r); };
-    if(hover(leftA)) DrawRectangleRec(leftA,{70,90,130,255}); else DrawRectangleRec(leftA,{60,80,120,255});
-    if(hover(rightA)) DrawRectangleRec(rightA,{70,90,130,255}); else DrawRectangleRec(rightA,{60,80,120,255});
-    int arrowFont = S(20);
-    DrawText("<", (int)(leftA.x+arrowW/2 - MeasureText("<",arrowFont)/2), (int)(leftA.y+S(6)),arrowFont,RAYWHITE);
-    DrawText(">", (int)(rightA.x+arrowW/2 - MeasureText(">",arrowFont)/2), (int)(rightA.y+S(6)),arrowFont,RAYWHITE);
-    if(click && hover(leftA)){ if(resolutionIndex>0){ resolutionIndex--; ApplyResolution(); settingsDirty=true; settingsSaveTimer=0.f; } }
-    if(click && hover(rightA)){ if(resolutionIndex<RESOLUTION_COUNT-1){ resolutionIndex++; ApplyResolution(); settingsDirty=true; settingsSaveTimer=0.f; } }
-    int labelFont = S(18);
-    int cw = kResolutions[resolutionIndex].w; int ch = kResolutions[resolutionIndex].h; std::string resLabel = std::to_string(cw) + "x" + std::to_string(ch); int rtw=MeasureText(resLabel.c_str(),labelFont); DrawText(resLabel.c_str(), rx + rw/2 - rtw/2, y+S(8), labelFont, RAYWHITE);
-    y += rh + S(10);
+    int p = Ui::UnitFor(scale);
+    int rw = (int)(300*scale), rh = (int)(38*scale);
+    int rx = Ui::RowX(uiCenterX, rw, sw, scale);
+    Ui::Inset({(float)rx,(float)y,(float)rw,(float)rh}, p, {18,20,36,255});
+    int arrowW = (int)(36*scale);
+    Rectangle leftA{(float)(rx+p),(float)(y+p),(float)arrowW,(float)(rh-2*p)};
+    Rectangle rightA{(float)(rx+rw-arrowW-p),(float)(y+p),(float)arrowW,(float)(rh-2*p)};
+    Ui::SetUnit(p);
+    bool canL = resolutionIndex>0, canR = resolutionIndex<RESOLUTION_COUNT-1;
+    if(Ui::Button(leftA, "<", mPos, click, Ui::STYLE_DARK, 0, canL)){ resolutionIndex--; ApplyResolution(); settingsDirty=true; settingsSaveTimer=0.f; }
+    if(Ui::Button(rightA, ">", mPos, click, Ui::STYLE_DARK, 0, canR)){ resolutionIndex++; ApplyResolution(); settingsDirty=true; settingsSaveTimer=0.f; }
+    const char* resLabel = TextFormat("%dx%d", kResolutions[resolutionIndex].w, kResolutions[resolutionIndex].h);
+    int k = Ui::TextKFor(scale);
+    Ui::TextCentered(resLabel, rx + rw/2.f, y + rh/2.f - Ui::GlyphHeight(k)/2.f, k, {255,214,110,255});
+    y += rh + 3*p;
 }
 
 void Game::ChangeScreen(GameState::Screen next, bool withFade){

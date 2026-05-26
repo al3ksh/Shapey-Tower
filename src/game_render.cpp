@@ -5,11 +5,14 @@
 #include "daily_challenge.h"
 #include "tutorial.h"
 #include "rng.h"
+#include <algorithm>
 #include <cmath>
 
 #include "debug.h"
 #include "constants.h"
 #include "world_art.h"
+#include "ui_kit.h"
+#include "rlgl.h"
 
 static Color LerpColor(Color a, Color b, float t) {
     return {
@@ -436,190 +439,251 @@ void Game::DrawBiomeEffects(int w, int h, float cameraY, float time) {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// HUD (drawn in 480x800 game space with a 2px pixel unit to match the world art)
+// ---------------------------------------------------------------------------------------------
+static constexpr int HP = 2; // HUD pixel unit
+
+static void DrawItemSprite(const Texture2D &items, int cell, float x, float y, float scale) {
+    if (items.id == 0) return;
+    DrawTexturePro(items, {(float)(cell * 16), 0, 16, 16}, {std::floor(x), std::floor(y), 16 * scale, 16 * scale}, {0, 0}, 0.f, WHITE);
+}
+
 void Game::DrawHud(float dt) {
     if (state.score > state.highScore) state.highScore = state.score;
     if (state.currentScreen == GameState::Screen::GAMEOVER) return;
-    DrawText(TextFormat("Score: %d  Best: %d", state.score, state.highScore), 10,
-             Const::HUD_TOP_MARGIN, Const::HUD_SCORE_FONT, RAYWHITE);
-    constexpr int MIN_COMBO = Const::COMBO_MIN_MULT;
-    unsigned char a = (state.comboTimer > 0) ? 255 : 70;
-    Color col = (state.comboCount >= MIN_COMBO && state.comboTimer > 0) ? Color{255, 200, 100, a}
-                                                                        : Color{160, 160, 160, a};
-    DrawText(TextFormat("Combo x%d", state.comboCount), 10, 40, Const::HUD_COMBO_FONT, col);
+    Ui::SetUnit(HP);
+    const Color muted{150, 160, 196, 255};
+    const Color gold{255, 214, 110, 255};
 
-    float radius = Const::HUD_CLOCK_RADIUS;
-    float clockX = cfg.gameWidth - radius - 20.f;
-    float clockY = radius + 20.f;
-    DrawCircleLines((int)clockX, (int)clockY, radius, RAYWHITE);
-    int segmentsDone = state.speedStage;
-    for (int s = 0; s < segmentsDone && s < 5; ++s) {
-        float a0 = -PI / 2 + (2 * PI / 5) * s;
-        float a1 = -PI / 2 + (2 * PI / 5) * (s + 1);
-        Vector2 p0{clockX + std::cos(a0) * radius * 0.9f, clockY + std::sin(a0) * radius * 0.9f};
-        Vector2 p1{clockX + std::cos(a1) * radius * 0.9f, clockY + std::sin(a1) * radius * 0.9f};
-        DrawLineEx({clockX, clockY}, p0, 2.f, {180, 180, 255, 200});
-        DrawLineEx({clockX, clockY}, p1, 2.f, {180, 180, 255, 200});
+    // --- Score panel (top-left) ---
+    {
+        const char *scoreTxt = TextFormat("%d", state.score);
+        int kScore = 4;
+        int sw = Ui::Measure(scoreTxt, kScore);
+        int w = std::max(120, sw + 12 * HP);
+        Rectangle pnl{8, 8, (float)w, 64};
+        Ui::Panel(pnl, HP, false, 215);
+        Ui::Text(Loc::HUD_Score(), pnl.x + 5 * HP, pnl.y + 4 * HP, 2, muted);
+        Ui::TextOutlined(scoreTxt, pnl.x + 5 * HP, pnl.y + 13 * HP, kScore, WHITE);
+
+        const char *bestTxt = TextFormat("%d", state.highScore);
+        Ui::DrawIcon(Ui::ICON_CROWN, 12, pnl.y + pnl.height + 6, HP);
+        Ui::TextOutlined(bestTxt, 12 + Ui::IconW(Ui::ICON_CROWN) * HP + 6, pnl.y + pnl.height + 7, 2, gold);
     }
-    float phase = (state.speedStage < 5) ? (state.stageTimer / cfg.STAGE_DURATION) : 0.f;
-    float angle = (state.speedStage < 5) ? (-PI / 2 + phase * 2 * PI) : (-PI / 2 - GetTime() * 5.f);
-    Vector2 hand{clockX + std::cos(angle) * radius * 0.85f, clockY + std::sin(angle) * radius * 0.85f};
-    DrawLineEx({clockX, clockY}, hand, 3.f,
-               (state.speedStage < 5) ? Color{255, 220, 120, 255} : Color{255, 80, 80, 255});
-    DrawCircle((int)clockX, (int)clockY, 3,
-               (state.speedStage < 5) ? RAYWHITE : Color{255, 80, 80, 255});
 
-    int coinY = (int)(clockY + radius + 15);
-    if (worldArt.items.id > 0)
-        DrawTexturePro(worldArt.items, {0, 0, 16, 16}, {(float)cfg.gameWidth - 57, (float)coinY - 12, 24, 24}, {0, 0}, 0.f, WHITE);
-    else
-        DrawCircle(cfg.gameWidth - 45, coinY, 8, GOLD);
-    DrawText(TextFormat("%d", state.globalCoins), cfg.gameWidth - 30, coinY - 10, 20, GOLD);
+    // --- Combo (under the score) ---
+    {
+        static int lastCombo = 0;
+        static float pop = 0.f;
+        if (state.comboCount > lastCombo) pop = 0.25f;
+        lastCombo = state.comboCount;
+        pop = std::max(0.f, pop - GetFrameTime());
+        if (state.comboCount >= 2 && state.comboTimer > 0) {
+            bool hot = state.comboCount >= Const::COMBO_MIN_MULT;
+            float y = 110;
+            int k = pop > 0.f ? 4 : 3;
+            Color c = hot ? Color{255, 150, 60, 255} : Color{255, 226, 150, 255};
+            float wob = hot ? std::round(std::sin(state.animTime * 20.f)) * HP : 0.f;
+            Ui::DrawIcon(Ui::ICON_FLAME, 10, y + wob, HP, hot ? WHITE : Color{255, 220, 200, 230});
+            const char *txt = TextFormat("x%d", state.comboCount);
+            Ui::TextOutlined(txt, 10 + Ui::IconW(Ui::ICON_FLAME) * HP + 6, y + (k == 4 ? -2 : 2), k, c);
+            Ui::Bar({10, y + 28, 96, 8}, HP, state.comboTimer / cfg.COMBO_WINDOW, hot ? Color{255, 120, 40, 255} : Color{240, 200, 90, 255});
+        }
+    }
+
+    // --- Active power-ups (left column) ---
+    {
+        float y = 158;
+        const char *names[4] = {Loc::HUD_DoubleJump(), Loc::HUD_Shield(), Loc::HUD_Slow(), Loc::HUD_Magnet()};
+        const bool active[4] = {state.activeDoubleJump, state.activeShield, state.activeSlowMotion, state.activeMagnet};
+        const float maxT[4] = {10.f, 8.f, 8.f, 10.f};
+        const Color cols[4] = {{100, 200, 255, 255}, {110, 240, 150, 255}, {190, 140, 255, 255}, {255, 190, 90, 255}};
+        for (int i = 0; i < 4; i++) {
+            if (!active[i] || state.powerUpTimers[i] <= 0) continue;
+            float t = state.powerUpTimers[i];
+            // blink when about to expire
+            if (t < 2.f && std::fmod(t, 0.3f) < 0.12f) { y += 40; continue; }
+            DrawItemSprite(worldArt.items, 4 + i, 6, y, 2.f);
+            Ui::TextOutlined(names[i], 44, y + 2, 2, WHITE);
+            Ui::Bar({44, y + 20, 90, 10}, HP, t / maxT[i], cols[i]);
+            y += 40;
+        }
+    }
+
+    // --- Coins pill (top-right) ---
+    float rightY = 8;
+    {
+        const char *coinTxt = TextFormat("%d", state.globalCoins);
+        int tw = Ui::Measure(coinTxt, 3);
+        float w = 32 + 3 * HP + tw + 10 * HP;
+        Rectangle pill{(float)cfg.gameWidth - 8 - w, rightY, w, 44};
+        Ui::Panel(pill, HP, false, 215);
+        DrawItemSprite(worldArt.items, 0, pill.x + 3 * HP, pill.y + 6, 2.f);
+        Ui::TextOutlined(coinTxt, pill.x + 3 * HP + 32 + 3 * HP, pill.y + 12, 3, gold);
+        rightY += 44 + 6;
+    }
+
+    // --- Speed stage gauge: bolt + 5 pips, the current one fills up ---
+    {
+        const int pips = 5;
+        const float pipW = 10, pipH = 16, gap = 2;
+        float w = Ui::IconW(Ui::ICON_BOLT) * HP + 6 + pips * pipW + (pips - 1) * gap;
+        float x = cfg.gameWidth - 8 - w - 6;
+        bool maxed = state.speedStage >= pips;
+        float phase = maxed ? 1.f : state.stageTimer / cfg.STAGE_DURATION;
+        bool flash = maxed && std::fmod(state.animTime, 0.5f) < 0.25f;
+        Ui::DrawIcon(Ui::ICON_BOLT, x, rightY, HP, maxed ? Color{255, 120, 100, 255} : WHITE);
+        float px = x + Ui::IconW(Ui::ICON_BOLT) * HP + 6;
+        for (int i = 0; i < pips; i++) {
+            Rectangle r{px + i * (pipW + gap), rightY + 1, pipW, pipH};
+            Ui::Frame(r, HP, {18, 20, 34, 230}, {18, 20, 34, 230}, {18, 20, 34, 230}, {6, 6, 14, 255});
+            float fill = (i < state.speedStage) ? 1.f : (i == state.speedStage ? phase : 0.f);
+            if (fill > 0.f) {
+                float ih = std::floor((pipH - 2 * HP) * fill / HP) * HP;
+                Color c = maxed ? (flash ? Color{255, 80, 70, 255} : Color{200, 40, 50, 255})
+                                : (i < state.speedStage ? Color{255, 206, 72, 255} : Color{140, 190, 255, 255});
+                DrawRectangle((int)r.x + HP, (int)(r.y + pipH - HP - ih), (int)pipW - 2 * HP, (int)ih, c);
+            }
+        }
+        rightY += pipH + 10;
+    }
 
     if (settings.showFPS) {
-        DrawText(TextFormat("FPS: %d", GetFPS()), cfg.gameWidth - 70, coinY + 15, 16, {255, 255, 255, 180});
+        const char *fps = TextFormat("%d FPS", GetFPS());
+        Ui::TextOutlined(fps, cfg.gameWidth - 12 - Ui::Measure(fps, 2), rightY, 2, {220, 230, 255, 200});
+        rightY += 20;
     }
 
     if (state.isDailyRun) {
         const char *challengeName = GetChallengeName(state.dailyChallenge.type);
-        int cw = MeasureText(challengeName, 14);
-        int y = coinY + (settings.showFPS ? 35 : 15);
-        int x = cfg.gameWidth - cw - 12;
-        DrawRectangle(x - 8, y, cw + 16, 22, Color{60, 40, 100, 200});
-        DrawText(challengeName, x, y + 4, 14, Color{255, 180, 80, 255});
+        int cw = Ui::Measure(challengeName, 2);
+        float w = cw + Ui::IconW(Ui::ICON_CALENDAR) * HP + 14 * HP / 2 + 8;
+        Rectangle tag{(float)cfg.gameWidth - 8 - w, rightY, w, 28};
+        Ui::Frame(tag, HP, {60, 40, 100, 220}, {100, 70, 150, 220}, {34, 22, 60, 220}, {6, 6, 14, 255});
+        Ui::DrawIcon(Ui::ICON_CALENDAR, tag.x + 3 * HP, tag.y + 5, HP);
+        Ui::Text(challengeName, tag.x + 3 * HP + Ui::IconW(Ui::ICON_CALENDAR) * HP + 6, tag.y + 7, 2, {255, 180, 80, 255});
     }
 
-    int powerUpY = 70;
-    if (state.activeDoubleJump && state.powerUpTimers[0] > 0) {
-        float pct = state.powerUpTimers[0] / 10.0f;
-        DrawRectangle(10, powerUpY, (int)(100 * pct), 12, Color{100, 200, 255, 200});
-        DrawText("2x Jump", 15, powerUpY - 2, 14, WHITE);
-        powerUpY += 18;
-    }
-    if (state.activeShield && state.powerUpTimers[1] > 0) {
-        float pct = state.powerUpTimers[1] / 10.0f;
-        DrawRectangle(10, powerUpY, (int)(100 * pct), 12, Color{100, 255, 150, 200});
-        DrawText("Shield", 15, powerUpY - 2, 14, WHITE);
-        powerUpY += 18;
-    }
-    if (state.activeSlowMotion && state.powerUpTimers[2] > 0) {
-        float pct = state.powerUpTimers[2] / 10.0f;
-        DrawRectangle(10, powerUpY, (int)(100 * pct), 12, Color{200, 150, 255, 200});
-        DrawText("Slow", 15, powerUpY - 2, 14, WHITE);
-        powerUpY += 18;
-    }
-    if (state.activeMagnet && state.powerUpTimers[3] > 0) {
-        float pct = state.powerUpTimers[3] / 10.0f;
-        DrawRectangle(10, powerUpY, (int)(100 * pct), 12, Color{255, 200, 100, 200});
-        DrawText("Magnet", 15, powerUpY - 2, 14, WHITE);
-    }
+    // --- Biome banner ---
     if (state.themeChangeTimer > 0) {
         state.themeChangeTimer -= dt;
-        float alpha = state.themeChangeTimer / 3.f;
-        if (alpha < 0) alpha = 0;
-        if (alpha > 1) alpha = 1;
-        int a2 = (int)(alpha * 255);
+        float t = state.themeChangeTimer;
+        float appear = std::fmin(1.f, (3.f - t) / 0.3f);
+        float fade = std::fmin(1.f, t / 0.6f);
+        float a = std::fmax(0.f, std::fmin(appear, fade));
+        unsigned char al = (unsigned char)(a * 255);
         const char *name = state.currentTheme.name;
-        int w = MeasureText(name, Const::HUD_THEME_FONT);
-        DrawText(name, cfg.gameWidth / 2 - w / 2, 80, Const::HUD_THEME_FONT,
-                 {255, 255, 255, (unsigned char)a2});
+        int k = Ui::FitK(name, 4, cfg.gameWidth - 80);
+        int len = (int)TextLength(name);
+        int tw = Ui::Measure(name, k) + (len - 1) * k;
+        float slide = std::round((1.f - appear) * -20.f / HP) * HP;
+        Rectangle ribbon{std::floor(cfg.gameWidth / 2.f - tw / 2.f - 20), 170 + slide, (float)tw + 40, (float)(7 * k + 24)};
+        Ui::Panel(ribbon, HP, true, (unsigned char)(al * 0.9f));
+        Ui::FancyText(name, ribbon.x + 20, ribbon.y + 10, k, {255, 255, 255, al}, {160, 200, 255, al}, {10, 10, 26, al}, 0.f, 0.f);
     }
 
+    // --- Achievement toast ---
     if (state.achievementPopupTimer > 0 && !state.lastUnlockedAchievement.empty()) {
         float t = state.achievementPopupTimer / 3.f;
         float slide = 1.f;
         if (t > 0.85f) slide = (1.f - t) / 0.15f;
         else if (t < 0.2f) slide = t / 0.2f;
-        if (slide > 1.f) slide = 1.f;
-        if (slide < 0.f) slide = 0.f;
+        slide = std::fmax(0.f, std::fmin(1.f, slide));
 
-        int popupW = 200, popupH = 36;
-        int popupX = 8;
-        int popupTargetY = cfg.gameHeight - popupH - 10;
-        int popupY = (int)(popupTargetY + (1.f - slide) * 50.f);
-        unsigned char popupAlpha = (unsigned char)(slide * 220);
-
-        DrawRectangle(popupX, popupY, popupW, popupH, {20, 25, 50, popupAlpha});
-        DrawRectangleLines(popupX, popupY, popupW, popupH, {255, 200, 80, popupAlpha});
-
-        DrawText("*", popupX + 6, popupY + 4, 11, {255, 200, 80, popupAlpha});
-        DrawText(state.lastUnlockedAchievement.c_str(), popupX + 18, popupY + 10, 14,
-                 {255, 255, 255, popupAlpha});
+        const char *nm = state.lastUnlockedAchievement.c_str();
+        int k = Ui::FitK(nm, 2, cfg.gameWidth - 90);
+        float popupW = std::fmax(220.f, (float)Ui::Measure(nm, k) + 64);
+        float popupH = 48;
+        float popupX = 8;
+        float popupY = std::round((cfg.gameHeight - popupH - 10 + (1.f - slide) * 70.f) / HP) * HP;
+        Ui::Panel({popupX, popupY, popupW, popupH}, HP, false, 235);
+        Ui::DrawIconCentered(Ui::ICON_TROPHY, popupX + 24, popupY + popupH / 2, HP);
+        const char *hdr = Loc::GetLanguage() == Language::EN ? "UNLOCKED!" : "ODBLOKOWANO!";
+        Ui::Text(hdr, popupX + 46, popupY + 8, 1, gold);
+        Ui::Text(nm, popupX + 46, popupY + 22, k, WHITE);
     }
 }
 
 void Game::DrawGameOverOverlay() {
     if (state.currentScreen != GameState::Screen::GAMEOVER) return;
-    for (int y = 0; y < cfg.gameHeight; y += Const::GRADIENT_STEP) {
-        float k = (float)y / cfg.gameHeight;
-        unsigned char a = (unsigned char)(160 + 60 * k);
-        DrawRectangle(0, y, cfg.gameWidth, Const::GRADIENT_STEP, {10, 12, 20, a});
-    }
+    Ui::SetUnit(HP);
+    DrawRectangleGradientV(0, 0, cfg.gameWidth, cfg.gameHeight, {10, 8, 20, 150}, {10, 8, 20, 220});
 
-    int buttons = 3;
+    float t = (float)GetTime();
+    float cx = cfg.gameWidth / 2.f;
+    int w = 360;
+    float x = std::floor(cx - w / 2.f);
+    float yTop = 120;
+    bool newBest = state.score > 0 && state.score > state.runStartHighScore && !state.isDailyRun;
+    float panelH = 36 + (state.isDailyRun ? 20 : 0) + (newBest ? 30 : 0) + 98 + 50 + 58 + 52 + 36 + 20;
+    Rectangle panel{x, yTop, (float)w, panelH};
+    Ui::Panel(panel, HP, true, 240);
 
-    int w = Const::GAMEOVER_PANEL_WIDTH;
-    int yTop = Const::GAMEOVER_TOP;
-    int bh = Const::GAMEOVER_BUTTON_H, spacing = Const::GAMEOVER_BUTTON_GAP;
-    int yButtonsTop = yTop + 125;
-    int h = (yButtonsTop - yTop) + buttons * bh + (buttons - 1) * spacing + 20;
-    int x = cfg.gameWidth / 2 - w / 2;
-    DrawRectangle(x, yTop, w, h, {25, 28, 42, 240});
-    DrawRectangleLines(x, yTop, w, h, {180, 200, 255, 180});
     const char *title = Loc::GameOver_Title();
-    int tw = MeasureText(title, Const::GAMEOVER_TITLE_FONT);
-    DrawText(title, cfg.gameWidth / 2 - tw / 2, yTop + 15, Const::GAMEOVER_TITLE_FONT, RAYWHITE);
+    int kT = 5;
+    int len = (int)TextLength(title);
+    int tw = Ui::Measure(title, kT) + (len - 1) * kT;
+    Ui::FancyText(title, cx - tw / 2.f, yTop - 22, kT, {255, 150, 120, 255}, {200, 40, 56, 255}, {20, 6, 14, 255}, 1.f, t);
 
+    float y = yTop + 36;
     if (state.isDailyRun) {
-        const char *challengeName = GetChallengeName(state.dailyChallenge.type);
-        int cnw = MeasureText(challengeName, 12);
-        DrawText(challengeName, cfg.gameWidth / 2 - cnw / 2, yTop + 42, 12, Color{255, 180, 80, 255});
+        Ui::TextCentered(GetChallengeName(state.dailyChallenge.type), cx, y, 2, {255, 180, 80, 255});
+        y += 20;
     }
 
-    const char *scoreTxt = TextFormat("%s %d", Loc::GameOver_Score(), state.score);
-    int sw = MeasureText(scoreTxt, Const::GAMEOVER_SCORE_FONT);
-    DrawText(scoreTxt, cfg.gameWidth / 2 - sw / 2, yTop + 60, Const::GAMEOVER_SCORE_FONT,
-             {255, 220, 140, 255});
+    if (newBest) {
+        const char *nb = Loc::GetLanguage() == Language::EN ? "NEW BEST!" : "NOWY REKORD!";
+        bool on = std::fmod(t, 0.6f) < 0.4f;
+        int nw = Ui::Measure(nb, 3);
+        float bx = std::floor(cx - (nw + 30) / 2.f);
+        Ui::DrawIcon(Ui::ICON_CROWN, bx, y + 1, HP);
+        Ui::TextOutlined(nb, bx + 30, y, 3, on ? Color{255, 226, 90, 255} : Color{255, 170, 60, 255});
+        y += 30;
+    }
+
+    // Score showcase
+    Rectangle box{x + 24, y, (float)w - 48, 84};
+    Ui::Inset(box, HP, {12, 12, 26, 255});
+    Ui::TextCentered(Loc::HUD_Score(), cx, box.y + 8, 2, {150, 160, 196, 255});
+    Ui::TextCentered(TextFormat("%d", state.score), cx, box.y + 28, 6, {255, 226, 150, 255});
+    y += box.height + 14;
 
     int bestScore = state.isDailyRun ? state.dailyChallenge.bestScore : state.highScore;
-    const char *bestLabel = state.isDailyRun ? Loc::Daily_Best() : Loc::GameOver_Best();
-    const char *bestTxt = TextFormat("%s %d", bestLabel, bestScore);
-    int bw = MeasureText(bestTxt, Const::GAMEOVER_BEST_FONT);
-    DrawText(bestTxt, cfg.gameWidth / 2 - bw / 2, yTop + 85, Const::GAMEOVER_BEST_FONT,
-             {200, 230, 255, 255});
+    float colL = cx - 80, colR = cx + 80;
+    {
+        const char *bs = TextFormat("%d", bestScore);
+        int bw = Ui::Measure(bs, 3);
+        float bx = std::floor(colL - (bw + 28) / 2.f);
+        Ui::DrawIcon(Ui::ICON_CROWN, bx, y + 3, HP);
+        Ui::Text(bs, bx + 28, y, 3, {200, 230, 255, 255});
+        const char *cs = TextFormat("%d", state.globalCoins);
+        int cw = Ui::Measure(cs, 3);
+        float cxx = std::floor(colR - (cw + 36) / 2.f);
+        DrawItemSprite(worldArt.items, 0, cxx, y - 6, 2.f);
+        Ui::Text(cs, cxx + 36, y, 3, {255, 214, 80, 255});
+        y += 26;
+        Ui::TextCentered(state.isDailyRun ? Loc::Daily_Best() : Loc::GameOver_Best(), colL, y, 1, {130, 136, 166, 255});
+        Ui::TextCentered(Loc::GameOver_Coins(), colR, y, 1, {130, 136, 166, 255});
+        y += 24;
+    }
 
-    const char *coinsTxt = TextFormat("%s %d", Loc::GameOver_Coins(), state.globalCoins);
-    int cw = MeasureText(coinsTxt, 16);
-    DrawText(coinsTxt, cfg.gameWidth / 2 - cw / 2, yTop + 108, 16, Color{255, 215, 0, 255});
-
-    int yb = yButtonsTop;
     Vector2 m = MapWindowToLogical(GetMousePosition());
     bool click = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
-
-    auto btn = [&](const char *label, Color baseColor = Color{60, 90, 140, 255},
-                   Color hoverColor = Color{90, 140, 220, 255}) {
-        int bw2 = 260, bh2 = Const::GAMEOVER_BUTTON_H;
-        int bx = cfg.gameWidth / 2 - bw2 / 2;
-        Rectangle rc{(float)bx, (float)yb, (float)bw2, (float)bh2};
-        Color c = CheckCollisionPointRec(m, rc) ? hoverColor : baseColor;
-        DrawRectangleRec(rc, c);
-        DrawRectangleLines(bx, yb, bw2, bh2, RAYWHITE);
-        int ltw = MeasureText(label, 20);
-        DrawText(label, bx + bw2 / 2 - ltw / 2, yb + 12, 20, RAYWHITE);
-        yb += bh2 + Const::GAMEOVER_BUTTON_GAP;
-        return rc;
-    };
-
-    Rectangle rRestart = btn(Loc::GameOver_Restart());
-    if (click && CheckCollisionPointRec(m, rRestart)) {
+    float bw2 = 260, bh2 = 46;
+    Rectangle rRestart{std::floor(cx - bw2 / 2), y, bw2, bh2};
+    if (Ui::Button(rRestart, Loc::GameOver_Restart(), m, click, Ui::STYLE_GREEN, 3)) {
         ResetGame();
         ChangeScreen(GameState::Screen::GAME, false);
     }
-    Rectangle rMenu = btn(Loc::GameOver_Menu());
-    if (click && CheckCollisionPointRec(m, rMenu)) {
+    y += bh2 + 12;
+    Rectangle rMenu{std::floor(cx - bw2 / 2), y, bw2, 40};
+    if (Ui::Button(rMenu, Loc::GameOver_Menu(), m, click, Ui::STYLE_BLUE, 2)) {
         ChangeScreen(GameState::Screen::MENU, false);
     }
-    Rectangle rExit = btn(Loc::GameOver_Exit());
-    if (click && CheckCollisionPointRec(m, rExit)) {
+    y += 40 + 12;
+    Rectangle rExit{std::floor(cx - 90), y, 180, 36};
+    if (Ui::Button(rExit, Loc::GameOver_Exit(), m, click, Ui::STYLE_RED, 2)) {
         running = false;
     }
 }
@@ -630,90 +694,70 @@ void Game::DrawRevivePrompt() {
     ClearBackground(BLACK);
 
     DrawGameWorld(0.f); // frozen world behind the prompt
-
-    DrawRectangle(0, 0, cfg.gameWidth, cfg.gameHeight, Color{0, 0, 0, 180});
+    DrawRectangleGradientV(0, 0, cfg.gameWidth, cfg.gameHeight, {10, 8, 20, 150}, {10, 8, 20, 220});
+    Ui::SetUnit(HP);
 
     float timerValue = state.reviveTimer > 0 ? state.reviveTimer : 0;
     int timerInt = (int)std::ceil(timerValue);
-
-    int centerX = cfg.gameWidth / 2;
-    int centerY = cfg.gameHeight / 2 - 60;
-    float radius = 80.f;
     float progress = timerValue / state.REVIVE_TIME_LIMIT;
+    float cx = cfg.gameWidth / 2.f;
+    float t = (float)GetTime();
 
-    DrawCircle(centerX, centerY, radius + 8, Color{40, 40, 50, 255});
-    DrawCircle(centerX, centerY, radius, Color{20, 25, 35, 255});
+    Rectangle panel{std::floor(cx - 170), 170, 340, 396};
+    Ui::Panel(panel, HP, true, 240);
+    const char *title = Loc::GameOver_Revive();
+    int len = (int)TextLength(title);
+    int tw = Ui::Measure(title, 5) + (len - 1) * 5;
+    Ui::FancyText(title, cx - tw / 2.f, panel.y - 22, 5, {170, 255, 170, 255}, {50, 170, 80, 255}, {6, 20, 10, 255}, 1.f, t);
 
-    float startAngle = -90.f;
-    float endAngle = startAngle + (360.f * progress);
-    Color arcColor;
-    if (timerInt <= 2) {
-        arcColor = Color{220, 80, 80, 255};
-    } else if (timerInt <= 3) {
-        arcColor = Color{220, 180, 80, 255};
-    } else {
-        arcColor = Color{80, 180, 80, 255};
+    // Countdown ring made of pixel blocks
+    float ringCy = panel.y + 130;
+    float radius = 72;
+    const int blocks = 40;
+    Color arc = timerInt <= 2 ? Color{230, 70, 70, 255} : (timerInt <= 3 ? Color{240, 190, 70, 255} : Color{90, 210, 100, 255});
+    for (int i = 0; i < blocks; i++) {
+        float a = -PI / 2 + (2 * PI) * i / blocks;
+        float bx = std::floor((cx + std::cos(a) * radius) / HP) * HP;
+        float by = std::floor((ringCy + std::sin(a) * radius) / HP) * HP;
+        bool lit = (float)i / blocks < progress;
+        DrawRectangle((int)bx - 5, (int)by - 5, 10, 10, {6, 6, 14, 255});
+        DrawRectangle((int)bx - 3, (int)by - 3, 6, 6, lit ? arc : Color{40, 44, 66, 255});
     }
-    DrawCircleSector({(float)centerX, (float)centerY}, radius - 5, startAngle, endAngle, 36, arcColor);
+    int kNum = 9;
+    bool pulse = timerInt <= 2 && std::fmod(timerValue, 1.f) > 0.5f;
+    Ui::TextOutlined(TextFormat("%d", timerInt), cx - Ui::Measure(TextFormat("%d", timerInt), kNum) / 2.f,
+                     ringCy - Ui::GlyphHeight(kNum) / 2.f, kNum, pulse ? Color{255, 120, 110, 255} : WHITE);
 
-    DrawCircle(centerX, centerY, radius - 15, Color{30, 35, 45, 255});
-
-    const char *timerText = TextFormat("%d", timerInt);
-    int timerFontSize = 60;
-    int tw = MeasureText(timerText, timerFontSize);
-    Color timerColor = timerInt <= 2 ? Color{255, 100, 100, 255} : Color{255, 255, 255, 255};
-    DrawText(timerText, centerX - tw / 2, centerY - timerFontSize / 2 + 5, timerFontSize, timerColor);
-
-    const char *reviveText = Loc::GameOver_Revive();
-    int rw = MeasureText(reviveText, 28);
-    DrawText(reviveText, centerX - rw / 2, centerY + (int)radius + 30, 28, WHITE);
-
+    // Cost
+    float y = ringCy + radius + 30;
     const char *costText = TextFormat("%d", state.reviveCost);
-    int cw = MeasureText(costText, 20);
-    DrawText(costText, centerX - cw / 2, centerY + (int)radius + 65, 20, Color{255, 215, 0, 255});
-    DrawCircle(centerX + cw / 2 + 15, centerY + (int)radius + 75, 8, Color{255, 215, 0, 255});
+    int cw = Ui::Measure(costText, 3);
+    float cx0 = std::floor(cx - (32 + 8 + cw) / 2.f);
+    DrawItemSprite(worldArt.items, 0, cx0, y - 6, 2.f);
+    Ui::TextOutlined(costText, cx0 + 40, y, 3, {255, 214, 80, 255});
+    y += 40;
 
     Vector2 m = MapWindowToLogical(GetMousePosition());
     bool click = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
-
-    int btnW = 200, btnH = 50;
-    int btnX = centerX - btnW / 2;
-    int btnY = centerY + (int)radius + 100;
-    Rectangle btnRect = {(float)btnX, (float)btnY, (float)btnW, (float)btnH};
-    bool hover = CheckCollisionPointRec(m, btnRect);
-
-    Color btnColor = hover ? Color{80, 200, 80, 255} : Color{60, 160, 60, 255};
-    DrawRectangleRec(btnRect, btnColor);
-    DrawRectangleLines(btnX, btnY, btnW, btnH, WHITE);
-
-    const char *btnText = Loc::GameOver_Revive();
-    int btw = MeasureText(btnText, 24);
-    DrawText(btnText, btnX + btnW / 2 - btw / 2, btnY + 13, 24, WHITE);
-
-    if (click && hover) {
+    Rectangle btn{std::floor(cx - 110), y, 220, 50};
+    if (Ui::Button(btn, Loc::GameOver_Revive(), m, click, Ui::STYLE_GREEN, 3, state.globalCoins >= state.reviveCost)) {
         RevivePlayer();
     }
-
-    int skipBtnW = 120, skipBtnH = 35;
-    int skipBtnX = centerX - skipBtnW / 2;
-    int skipBtnY = btnY + btnH + 20;
-    Rectangle skipRect = {(float)skipBtnX, (float)skipBtnY, (float)skipBtnW, (float)skipBtnH};
-    bool skipHover = CheckCollisionPointRec(m, skipRect);
-
-    Color skipColor = skipHover ? Color{100, 70, 70, 255} : Color{70, 50, 50, 255};
-    DrawRectangleRec(skipRect, skipColor);
-    DrawRectangleLines(skipBtnX, skipBtnY, skipBtnW, skipBtnH, Color{200, 200, 200, 200});
-
-    const char *skipText = Loc::GameOver_Cancel();
-    int stw = MeasureText(skipText, 18);
-    DrawText(skipText, skipBtnX + skipBtnW / 2 - stw / 2, skipBtnY + 9, 18, Color{200, 200, 200, 255});
-
-    if (click && skipHover) {
+    y += 50 + 14;
+    Rectangle skip{std::floor(cx - 70), y, 140, 36};
+    if (Ui::Button(skip, Loc::GameOver_Cancel(), m, click, Ui::STYLE_RED, 2)) {
         ChangeScreen(GameState::Screen::GAMEOVER, false);
     }
 
     EndTextureMode();
 
+    BeginDrawing();
+    ClearBackground(BLACK);
+    PresentGameRT();
+    EndDrawing();
+}
+
+void Game::PresentGameRT() {
     int winW = GetScreenWidth(), winH = GetScreenHeight();
     float scale = std::fmin((float)winW / cfg.gameWidth, (float)winH / cfg.gameHeight);
     int drawW = (int)(cfg.gameWidth * scale);
@@ -721,13 +765,70 @@ void Game::DrawRevivePrompt() {
     int offX = (winW - drawW) / 2;
     int offY = (winH - drawH) / 2;
     viewportRect = {(float)offX, (float)offY, (float)drawW, (float)drawH};
-
-    BeginDrawing();
-    ClearBackground(BLACK);
-    Rectangle src = {0, 0, (float)gameRT.texture.width, (float)-gameRT.texture.height};
-    Rectangle dst = {(float)offX, (float)offY, (float)drawW, (float)drawH};
+    DrawVerticalGradient(winW, winH, state.currentTheme.bgTop, state.currentTheme.bgBottom);
+    if (gameRT.id == 0) return;
+    if (drawW < winW - 1 || drawH < winH - 1) {
+        SetTextureFilter(gameRT.texture, TEXTURE_FILTER_BILINEAR); // soft blurred backdrop for letterbox
+        float bgScale = std::fmax((float)winW / cfg.gameWidth, (float)winH / cfg.gameHeight) * 1.15f;
+        float bgW = cfg.gameWidth * bgScale;
+        float bgH = cfg.gameHeight * bgScale;
+        Rectangle bgSrc{0, 0, (float)gameRT.texture.width, (float)-gameRT.texture.height};
+        Rectangle bgDst{(winW - bgW) / 2.f, (winH - bgH) / 2.f, bgW, bgH};
+        DrawTexturePro(gameRT.texture, bgSrc, bgDst, {0, 0}, 0.f, Color{255, 255, 255, 60});
+        DrawTexturePro(gameRT.texture, bgSrc, bgDst, {0, 0}, 0.f, Color{200, 200, 255, 40});
+        DrawRectangle(0, 0, winW, winH, Color{0, 0, 20, 90});
+    }
+    SetTextureFilter(gameRT.texture, TEXTURE_FILTER_POINT); // keep pixel art crisp
+    Rectangle src{0, 0, (float)gameRT.texture.width, (float)-gameRT.texture.height};
+    Rectangle dst{(float)offX, (float)offY, (float)drawW, (float)drawH};
+    // Overlays leave the render target's alpha below 1; copy it opaque so the backdrop can't bleed through.
+    rlDrawRenderBatchActive();
+    rlSetBlendFactors(RL_ONE, RL_ZERO, RL_FUNC_ADD);
+    BeginBlendMode(BLEND_CUSTOM);
     DrawTexturePro(gameRT.texture, src, dst, {0, 0}, 0.f, WHITE);
-    EndDrawing();
+    EndBlendMode();
+}
+
+void Game::RenderMenuScene(float time) {
+    EnsureRenderTarget();
+    BeginTextureMode(gameRT);
+    ClearBackground(BLACK);
+    int W = cfg.gameWidth, H = cfg.gameHeight;
+    if (!worldArt.loaded || state.themes.empty()) {
+        DrawVerticalGradient(W, H, {20, 24, 44, 255}, {8, 8, 16, 255});
+        EndTextureMode();
+        return;
+    }
+    // Slow climb up an endless tower, cycling through the biomes with a crossfade
+    const float period = 9.f, fadeTime = 1.5f;
+    int n = (int)state.themes.size();
+    int cur = (int)(time / period) % n;
+    int next = (cur + 1) % n;
+    float local = std::fmod(time, period);
+    float blend = local > period - fadeTime ? (local - (period - fadeTime)) / fadeTime : 0.f;
+    float camY = -time * 45.f;
+
+    auto layer = [&](int idx, unsigned char a) {
+        Color tint{255, 255, 255, a};
+        WorldArt::DrawSky(worldArt, idx, W, H, tint);
+        WorldArt::DrawBiomeLayers(worldArt, state.themes[idx].biomeType, camY, W, H, tint);
+    };
+    layer(cur, 255);
+    if (blend > 0.f) layer(next, (unsigned char)(blend * 255));
+
+    // Floating platforms drifting past, in the current biome's tiles
+    int biome = state.themes[blend > 0.5f ? next : cur].biomeType;
+    const float spacing = 120.f;
+    float scroll = std::fmod(-camY, spacing);
+    for (int i = -1; i < H / (int)spacing + 2; i++) {
+        float wy = i * spacing + scroll;
+        int idx = i - (int)std::floor(-camY / spacing);
+        unsigned int h = (unsigned int)(idx * 2654435761u);
+        float pw = 80.f + (float)(h % 5) * 16.f;
+        float px = 20.f + (float)((h >> 8) % (unsigned int)(W - 40 - pw));
+        WorldArt::DrawPlatform(worldArt, {px, std::floor(wy), pw, 18.f}, biome, {255, 255, 255, 200});
+    }
+    EndTextureMode();
 }
 
 void Game::DrawGame(float dt) {
@@ -753,34 +854,10 @@ void Game::DrawGame(float dt) {
     DrawTutorialOverlay(state.tutorial, cfg.gameWidth, cfg.gameHeight);
 
     EndTextureMode();
-    int winW = GetScreenWidth(), winH = GetScreenHeight();
-    float scale = std::fmin((float)winW / cfg.gameWidth, (float)winH / cfg.gameHeight);
-    int drawW = (int)(cfg.gameWidth * scale);
-    int drawH = (int)(cfg.gameHeight * scale);
-    int offX = (winW - drawW) / 2;
-    int offY = (winH - drawH) / 2;
-    viewportRect = {(float)offX, (float)offY, (float)drawW, (float)drawH};
     BeginDrawing();
-    DrawVerticalGradient(winW, winH, state.currentTheme.bgTop, state.currentTheme.bgBottom);
-    if (gameRT.id > 0) {
-        SetTextureFilter(gameRT.texture, TEXTURE_FILTER_BILINEAR); // soft blurred backdrop for letterbox
-        float bgScale = std::fmax((float)winW / cfg.gameWidth, (float)winH / cfg.gameHeight) * 1.15f;
-        float bgW = cfg.gameWidth * bgScale;
-        float bgH = cfg.gameHeight * bgScale;
-        float bgX = (winW - bgW) / 2.f;
-        float bgY = (winH - bgH) / 2.f;
-        Rectangle bgSrc{0, 0, (float)gameRT.texture.width, (float)-gameRT.texture.height};
-        Rectangle bgDst{bgX, bgY, bgW, bgH};
-        DrawTexturePro(gameRT.texture, bgSrc, bgDst, {0, 0}, 0.f, Color{255, 255, 255, 60});
-        DrawTexturePro(gameRT.texture, bgSrc, bgDst, {0, 0}, 0.f, Color{200, 200, 255, 40});
-        DrawRectangle(0, 0, winW, winH, Color{0, 0, 20, 90});
-    }
-    SetTextureFilter(gameRT.texture, TEXTURE_FILTER_POINT); // keep pixel art crisp
-    Rectangle src{0, 0, (float)gameRT.texture.width, (float)-gameRT.texture.height};
-    Rectangle dst{(float)offX, (float)offY, (float)drawW, (float)drawH};
-    DrawTexturePro(gameRT.texture, src, dst, {0, 0}, 0.f, WHITE);
+    PresentGameRT();
     if (state.fadeAlpha > 0.01f)
-        DrawRectangle(0, 0, winW, winH, {0, 0, 0, (unsigned char)(state.fadeAlpha * 255)});
+        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), {0, 0, 0, (unsigned char)(state.fadeAlpha * 255)});
     EndDrawing();
 }
 

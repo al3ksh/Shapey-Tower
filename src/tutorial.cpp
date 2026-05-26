@@ -1,6 +1,7 @@
 #include "tutorial.h"
 #include "localization.h"
 #include "raylib.h"
+#include "ui_kit.h"
 #include <cmath>
 #include <cstdio>
 
@@ -152,29 +153,29 @@ void DrawTutorialOverlay(const TutorialState &ts, int gameWidth, int gameHeight)
     int boxY = gameHeight - boxH - 50;
 
     DrawRectangle(0, boxY - 10, gameWidth, boxH + 60, Color{0, 0, 0, (unsigned char)(masterAlpha * 0.5f)});
-    DrawRectangle(boxX, boxY, boxW, boxH, Color{10, 18, 40, (unsigned char)(masterAlpha * 0.92f)});
-    DrawRectangleLines(boxX, boxY, boxW, boxH, Color{80, 160, 255, (unsigned char)(masterAlpha * 0.8f)});
+    Ui::SetUnit(2);
+    Ui::Panel({(float)boxX, (float)boxY, (float)boxW, (float)boxH}, 2, false, (unsigned char)(masterAlpha * 0.94f));
 
     float pulse = (std::sin(ts.arrowPulse) * 0.5f + 0.5f);
     unsigned char iconAlpha = (unsigned char)(masterAlpha * (0.5f + 0.5f * pulse));
 
     int iconX = boxX + 14;
     int iconY = boxY + 8;
-    DrawText("!", iconX + 2, iconY, 22, Color{100, 200, 255, iconAlpha});
+    Ui::DrawIcon(Ui::ICON_SPARK, iconX - 4, iconY + 2, 2, Color{255, 255, 255, iconAlpha});
 
     const char *mainText = GetStepText(ts.currentStep);
-    int mainFont = 17;
-    int tw = MeasureText(mainText, mainFont);
+    int mainFont = Ui::FitK(mainText, 2, boxW - 44) * 10;
+    int tw = Ui::MeasureTextPx(mainText, mainFont);
     int textX = boxX + boxW / 2 - tw / 2;
     if (textX < boxX + 30) textX = boxX + 30;
-    DrawText(mainText, textX, boxY + 12, mainFont, Color{255, 255, 255, masterAlpha});
+    Ui::DrawTextPx(mainText, textX, boxY + 12, mainFont, Color{255, 255, 255, masterAlpha});
 
     const char *subText = GetStepSubText(ts.currentStep);
     int subFont = 13;
-    int stw = MeasureText(subText, subFont);
+    int stw = Ui::MeasureTextPx(subText, subFont);
     int subX = boxX + boxW / 2 - stw / 2;
     if (subX < boxX + 30) subX = boxX + 30;
-    DrawText(subText, subX, boxY + 36, subFont, Color{180, 200, 230, (unsigned char)(masterAlpha * 0.85f)});
+    Ui::DrawTextPx(subText, subX, boxY + 36, subFont, Color{180, 200, 230, (unsigned char)(masterAlpha * 0.85f)});
 
     bool isActionStep = (ts.currentStep == TutorialStep::MOVE_LEFT_RIGHT ||
                          ts.currentStep == TutorialStep::JUMP ||
@@ -208,16 +209,16 @@ void DrawTutorialOverlay(const TutorialState &ts, int gameWidth, int gameHeight)
                 break;
         }
         int hintFont = 12;
-        int hw = MeasureText(hint, hintFont);
-        DrawText(hint, boxX + boxW / 2 - hw / 2, boxY + boxH - 18, hintFont,
+        int hw = Ui::MeasureTextPx(hint, hintFont);
+        Ui::DrawTextPx(hint, boxX + boxW / 2 - hw / 2, boxY + boxH - 18, hintFont,
                  Color{140, 220, 160, (unsigned char)(masterAlpha * 0.9f)});
     }
 
     if (ts.stepTimer > 1.f) {
         const char *skipText = Loc::Tutorial_Skip();
         int skipFont = 11;
-        int skipW = MeasureText(skipText, skipFont);
-        DrawText(skipText, gameWidth / 2 - skipW / 2, boxY + boxH + 8, skipFont,
+        int skipW = Ui::MeasureTextPx(skipText, skipFont);
+        Ui::DrawTextPx(skipText, gameWidth / 2 - skipW / 2, boxY + boxH + 8, skipFont,
                  Color{120, 120, 140, (unsigned char)(masterAlpha * 0.6f)});
     }
 }

@@ -24,6 +24,7 @@
 #include "leaderboard.h"
 #include "world_art.h"
 #include "skins.h"
+#include "ui_kit.h"
 
 namespace UiLayout {
     inline constexpr int ButtonGap = 18;
@@ -45,6 +46,7 @@ struct GameState {
     float themeChangeTimer = 0.f;
     int score = 0;
     int highScore = 0;
+    int runStartHighScore = 0;   // best score before this run, for the NEW BEST badge
     float comboTimer=0.f; int comboCount=0; int lastLandedPlatformIndex=0; int lastScoredPlatformIndex=-1; float lastLandY=0.f;
     bool gameOver=false;
     std::vector<Particle> particles;
@@ -202,32 +204,21 @@ private:
     void DrawResolutionSelector(int &y, float uiCenterX, Vector2 mPos, bool click, int sw, float scale = 1.0f);
     void ApplyAudioVolumes();
     void ApplyMenuAudioVolumes();
-    template<typename RebindEnum>
-    Rectangle DrawRebindKey(int &y, float uiCenterX, Vector2 mPos, int sw, const char* label, int key, RebindEnum active, RebindEnum selfId, bool &clicked, float blinkAlpha, Rectangle &lastHover, const char* &lastDefault, const char* defaultTxt, bool &activeChanged){
-        auto clampX=[&](int desired,int w){ int x=desired; if(x<10) x=10; if(x+w>sw-10) x=sw-10-w; return x; };
-        int w=320,h=30; int x=clampX((int)(uiCenterX - w/2),w); Rectangle rc{(float)x,(float)y,(float)w,(float)h}; bool isActive = (active==selfId); bool hover=CheckCollisionPointRec(mPos,rc); if(hover){ lastHover=rc; lastDefault=defaultTxt; }
-        Color base=isActive?Color{120,70,30,255}:Color{50,60,80,255}; if(isActive){ base={(unsigned char)(120 + 40*blinkAlpha),(unsigned char)(70 + 30*blinkAlpha),30,255}; }
-        DrawRectangleRec(rc,base); DrawRectangleLines((int)rc.x,(int)rc.y,(int)rc.width,(int)rc.height,RAYWHITE);
-        std::string txt=std::string(label)+": "+KeyName(key); if(isActive) txt += "  (nacisnij klawisz)"; DrawText(txt.c_str(), x+10, y+7,16,RAYWHITE);
-        clicked=false; if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hover){ clicked=true; activeChanged=true; }
-        y += h + 8; return rc;
-    }
     Vector2 MapWindowToLogical(Vector2 win) const {
         if(viewportRect.width<=0 || viewportRect.height<=0) return win;
         float scale = viewportRect.width / (float)cfg.gameWidth; // uniform
         Vector2 out { (win.x - viewportRect.x)/scale, (win.y - viewportRect.y)/scale };
         return out;
     }
-    Rectangle GuiButtonCentered(float centerX, int &y, int w, int h, const char* label, Vector2 mouse, bool &pressedOut) const {
-        int bx = (int)(centerX - w/2);
-        Rectangle rc{(float)bx,(float)y,(float)w,(float)h};
-        bool hover = CheckCollisionPointRec(mouse, rc);
-        Color c = hover?Color{90,140,220,255}:Color{60,90,140,255};
-        DrawRectangleRec(rc,c); DrawRectangleLines(bx,y,w,h,RAYWHITE);
-        int tw=MeasureText(label,20); DrawText(label,bx + w/2 - tw/2,y+ (h-20)/2,20,RAYWHITE);
-        if(hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) pressedOut=true; else pressedOut=false;
-        y += h + UiLayout::ButtonGap; return rc;
+    Rectangle GuiButtonCentered(float centerX, int &y, int w, int h, const char* label, Vector2 mouse, bool &pressedOut, Ui::Style style = Ui::STYLE_BLUE) const {
+        Rectangle rc{std::floor(centerX - w/2.f), (float)y, (float)w, (float)h};
+        pressedOut = Ui::Button(rc, label, mouse, IsMouseButtonPressed(MOUSE_LEFT_BUTTON), style);
+        y += h + Ui::Unit() * 4; return rc;
     }
+    // Draws gameRT letterboxed into the window (blurred backdrop + crisp pixel blit); no Begin/EndDrawing.
+    void PresentGameRT();
+    // Animated tower scene rendered into gameRT for the menu background.
+    void RenderMenuScene(float time);
     void DrawGameWorld(float dt);
     Texture2D PlayerFrame(int skin, int frame) const {
         if(state.playerFramesPerSkin <= 0) return state.playerTexture;
@@ -236,6 +227,7 @@ private:
     }
     void DrawPlayerPreview(Vector2 feet, float scale, int skin, float time, bool running);
     void DrawHeroTab(int &y, float uiCenterX, Vector2 mPos, bool click);
+    void DrawLanguageBox(Vector2 mPos, bool click, int sw, int sh, float scale);
     void DrawHud(float dt);
     void DrawGameOverOverlay();
     void DrawBiomeEffects(int w, int h, float cameraY, float time);

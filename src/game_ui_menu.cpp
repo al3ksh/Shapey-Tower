@@ -14,129 +14,121 @@
 
 static int menuTab = 0;
 static float uiScale = 1.0f;
+static int P = 2;       // pixel unit for frames/icons
+static int kB = 2;      // body text scale
+static int kS = 1;      // small text scale
 
 static int S(int base) { return (int)(base * uiScale); }
-static float Sf(float base) { return base * uiScale; }
 
-static void DrawSelector(int &y, float uiCenterX, const char** options, int optCount, int &selected, Vector2 mPos, bool click, bool &changed, int sw) {
-    int boxW = S(280), boxH = S(30);
-    int boxX = (int)(uiCenterX - boxW/2);
-    if(boxX < S(10)) boxX = S(10);
-    if(boxX + boxW > sw - S(10)) boxX = sw - S(10) - boxW;
-    int gap = S(3);
+static const Color kGold{255, 214, 110, 255};
+static const Color kMuted{150, 156, 184, 255};
+static const Color kDim{104, 110, 138, 255};
+
+static void DrawSelector(int &y, float uiCenterX, const char** options, int optCount, int &selected, Vector2 mPos, bool click, bool &changed, int sw, const Ui::Style *selStyles = nullptr) {
+    int boxW = S(300), boxH = S(36);
+    int boxX = Ui::RowX(uiCenterX, boxW, sw, uiScale);
+    int gap = 2 * P;
     int btnW = (boxW - (optCount-1)*gap) / optCount;
     for(int i = 0; i < optCount; i++) {
         Rectangle rect{(float)(boxX + i*(btnW+gap)), (float)y, (float)btnW, (float)boxH};
         bool sel = (selected == i);
-        bool hov = CheckCollisionPointRec(mPos, rect);
-        Color col = sel ? Color{60,140,100,255} : (hov ? Color{60,80,110,255} : Color{45,55,70,255});
-        DrawRectangleRec(rect, col);
-        DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, sel ? Color{100,220,140,255} : Color{80,80,80,255});
-        int fontSize = S(13);
-        int tw = MeasureText(options[i], fontSize);
-        DrawText(options[i], (int)(rect.x + rect.width/2 - tw/2), (int)(rect.y + boxH/2 - fontSize/2), fontSize, RAYWHITE);
-        if(click && hov && selected != i) { selected = i; changed = true; }
+        Ui::Style st = sel ? (selStyles ? selStyles[i] : Ui::STYLE_BLUE) : Ui::STYLE_DARK;
+        if(Ui::Button(rect, options[i], mPos, click, st, kB) && !sel) { selected = i; changed = true; }
     }
-    y += boxH + S(10);
+    y += boxH + 4 * P;
 }
 
-static void DrawDifficultySelector(int &y, float uiCenterX, const char** options, int &selected, Vector2 mPos, bool click, bool &changed, int sw) {
-    int boxW = S(280), boxH = S(30);
-    int boxX = (int)(uiCenterX - boxW/2);
-    if(boxX < S(10)) boxX = S(10);
-    if(boxX + boxW > sw - S(10)) boxX = sw - S(10) - boxW;
-    Color selColors[3] = {Color{60,160,80,255},Color{200,160,50,255},Color{180,60,60,255}};
-    Color borderColors[3] = {Color{100,220,100,255},Color{255,200,80,255},Color{255,100,100,255}};
-    int gap = S(3);
-    int btnW = (boxW - 2*gap) / 3;
-    for(int i = 0; i < 3; i++) {
-        Rectangle rect{(float)(boxX + i*(btnW+gap)), (float)y, (float)btnW, (float)boxH};
-        bool sel = (selected == i);
-        bool hov = CheckCollisionPointRec(mPos, rect);
-        Color bgCol, borderCol;
-        if(sel) { bgCol = selColors[i]; borderCol = borderColors[i]; }
-        else if(hov) { bgCol = Color{(unsigned char)(selColors[i].r/2),(unsigned char)(selColors[i].g/2),(unsigned char)(selColors[i].b/2),255}; borderCol = Color{80,80,80,255}; }
-        else { bgCol = Color{45,55,70,255}; borderCol = Color{80,80,80,255}; }
-        DrawRectangleRec(rect, bgCol);
-        DrawRectangleLines((int)rect.x,(int)rect.y,(int)rect.width,(int)rect.height,borderCol);
-        int fontSize = S(13);
-        int tw = MeasureText(options[i], fontSize);
-        DrawText(options[i], (int)(rect.x+rect.width/2-tw/2),(int)(rect.y+boxH/2-fontSize/2),fontSize,RAYWHITE);
-        if(click && hov && selected != i) { selected = i; changed = true; }
-    }
-    y += boxH + S(10);
+// Coin sprite + amount, centered on cx.
+static void DrawCoinAmount(const Texture2D &items, float cx, float y, int amount, int k, int p) {
+    const char *txt = TextFormat("%d", amount);
+    int tw = Ui::Measure(txt, k);
+    int cs = 16 * std::max(1, p / 2);
+    float x = std::floor(cx - (cs + 3 * p + tw) / 2.f);
+    if(items.id > 0)
+        DrawTexturePro(items, {0, 0, 16, 16}, {x, std::floor(y + Ui::GlyphHeight(k) / 2.f - cs / 2.f), (float)cs, (float)cs}, {0, 0}, 0.f, WHITE);
+    Ui::Text(txt, x + cs + 3 * p, y, k, kGold);
 }
 
 void Game::DrawMenu(){
-    BeginDrawing();
-    ClearBackground(Color{12,16,24,255});
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
-    
     uiScale = sh / 720.0f;
-    if(uiScale < 1.0f) uiScale = 1.0f; 
-    
+    if(uiScale < 1.0f) uiScale = 1.0f;
+    P = Ui::UnitFor(uiScale);
+    kB = Ui::TextKFor(uiScale);
+    kS = std::max(2, kB - 1);
+    Ui::SetUnit(P);
+    float time = (float)GetTime();
+
+    RenderMenuScene(time);
+
+    BeginDrawing();
+    ClearBackground(BLACK);
+    PresentGameRT();
+    DrawRectangleGradientV(0, 0, sw, sh, Color{6, 6, 18, 30}, Color{6, 6, 18, 120});
+
     viewportRect = {0,0,(float)sw,(float)sh};
     float uiCenterX = sw / 2.f;
     Vector2 mPos = GetMousePosition();
     bool click = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
     bool drag = IsMouseButtonDown(MOUSE_LEFT_BUTTON);
-    
-    const char* title = "SHAPEY TOWER";
-    int titleFont = S(38);
-    int tw = MeasureText(title, titleFont);
-    DrawText(title, (int)(uiCenterX - tw/2), S(20), titleFont, RAYWHITE);
-    DrawText("v1.5", sw - S(45), sh - S(22), S(12), Color{70,70,70,255});
-    
-    int tabY = S(72);
-    int tabGap = S(3);
-    int tabW = std::min(S(60), (sw - S(12) - 6 * tabGap) / 7), tabH = S(28);
-    float tabStartX = uiCenterX - (7 * tabW + 6*tabGap) / 2.f;
-    if(Ui::DrawTabButton(tabStartX, tabY, tabW, tabH, Loc::Tab_Game(), 0, menuTab, mPos, click, uiScale)) menuTab=0;
-    if(Ui::DrawTabButton(tabStartX + (tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Video(), 1, menuTab, mPos, click, uiScale)) menuTab=1;
-    if(Ui::DrawTabButton(tabStartX + 2*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Audio(), 2, menuTab, mPos, click, uiScale)) menuTab=2;
-    if(Ui::DrawTabButton(tabStartX + 3*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Keys(), 3, menuTab, mPos, click, uiScale)) menuTab=3;
-    if(Ui::DrawTabButton(tabStartX + 4*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Effects(), 4, menuTab, mPos, click, uiScale)) menuTab=4;
-    if(Ui::DrawTabButton(tabStartX + 5*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Stats(), 5, menuTab, mPos, click, uiScale)) menuTab=5;
-    if(Ui::DrawTabButton(tabStartX + 6*(tabW+tabGap), tabY, tabW, tabH, Loc::Tab_Hero(), 6, menuTab, mPos, click, uiScale)) menuTab=6;
-    
-    int contentY = tabY + tabH + S(20);
-    int y = contentY;
+
+    // Logo
+    {
+        const char* title = "SHAPEY TOWER";
+        int kT = std::max(3, (int)(3.6f * uiScale + 0.5f));
+        int glyphs = 0;
+        for(const char* c = title; *c; ++c) glyphs++;
+        // FancyText uses 2-unit letter spacing; approximate width for centering
+        int tw = Ui::Measure(title, kT) + (glyphs - 1) * kT;
+        while(tw > sw - S(24) && kT > 2) { kT--; tw = Ui::Measure(title, kT) + (glyphs - 1) * kT; }
+        Ui::FancyText(title, uiCenterX - tw / 2.f, (float)S(18), kT, Color{255, 236, 150, 255}, Color{240, 140, 50, 255},
+                      Color{24, 10, 30, 255}, 1.f, time);
+    }
+
+    // Icon tabs
+    const Ui::Icon tabIcons[7] = {Ui::ICON_PAD, Ui::ICON_MONITOR, Ui::ICON_SPEAKER, Ui::ICON_KEY, Ui::ICON_SPARK, Ui::ICON_TROPHY, Ui::ICON_HOOD};
+    int tabY = S(78);
+    int tabGap = 2 * P;
+    int tabW = std::min(S(50), (sw - S(16) - 6 * tabGap) / 7), tabH = S(38);
+    float tabStartX = std::floor(uiCenterX - (7 * tabW + 6 * tabGap) / 2.f);
+    for(int i = 0; i < 7; i++) {
+        Rectangle r{tabStartX + i * (tabW + tabGap), (float)tabY, (float)tabW, (float)tabH};
+        if(Ui::IconButton(r, tabIcons[i], mPos, click, menuTab == i)) menuTab = i;
+    }
+
+    // Content panel
+    int panelTop = tabY + tabH + 3 * P;
+    int panelW = std::min(sw - S(16), S(380));
+    static int contentBottom[8] = {0};
+    int maxPanelH = sh - panelTop - S(48);
+    int panelH = (menuTab != 5 && contentBottom[menuTab] > 0) ? std::min(maxPanelH, contentBottom[menuTab] - panelTop + S(10)) : maxPanelH;
+    Rectangle panel{std::floor(uiCenterX - panelW / 2.f), (float)panelTop, (float)panelW, (float)panelH};
+    Ui::Panel(panel, P, true, 230);
+
+    int y = panelTop + S(14);
     bool settingsChanged = false;
-    
+
     if(menuTab == 0) {
         Ui::DrawSectionHeader(y, uiCenterX, Loc::Menu_StartGame(), uiScale);
-        y += S(8);
-        
-        DrawText(Loc::Menu_Difficulty(), (int)(uiCenterX - S(140)), y, S(13), Color{180,180,180,255});
-        y += S(18);
-        const char* diffNames[] = {"EASY", "NORMAL", "HARD"};
+
+        Ui::TextCentered(Loc::Menu_Difficulty(), uiCenterX, (float)y, kS, kMuted);
+        y += Ui::GlyphHeight(kS) + 3 * P;
+        const char* diffNames[] = {Loc::Menu_Easy(), Loc::Menu_Normal(), Loc::Menu_Hard()};
+        const Ui::Style diffStyles[] = {Ui::STYLE_GREEN, Ui::STYLE_GOLD, Ui::STYLE_RED};
         int diffInt = (int)state.difficulty;
         bool diffChanged = false;
-        DrawDifficultySelector(y, uiCenterX, diffNames, diffInt, mPos, click, diffChanged, sw);
+        DrawSelector(y, uiCenterX, diffNames, 3, diffInt, mPos, click, diffChanged, sw, diffStyles);
         if(diffChanged) {
             state.difficulty = (Difficulty)diffInt;
             settingsDirty = true;
         }
-        
-        const char* diffDescEN[] = {
-            "Wider platforms, more coins",
-            "Standard settings",
-            "Narrow platforms, faster pace"
-        };
-        const char* diffDescPL[] = {
-            "Szersze platformy, wiecej monet",
-            "Standardowe ustawienia",
-            "Wezsze platformy, szybsze tempo"
-        };
-        const char* diffDesc = (Loc::GetLanguage() == Language::EN) ? diffDescEN[diffInt] : diffDescPL[diffInt];
-        int descFont = S(11);
-        int ddw = MeasureText(diffDesc, descFont);
-        DrawText(diffDesc, (int)(uiCenterX - ddw/2), y, descFont, Color{130,130,150,255});
-        y += S(20);
-        
+        const char* diffDesc[] = {Loc::Menu_EasyDesc(), Loc::Menu_NormalDesc(), Loc::Menu_HardDesc()};
+        Ui::TextCentered(diffDesc[diffInt], uiCenterX, (float)y, kS, kDim);
+        y += Ui::GlyphHeight(kS) + 5 * P;
+
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, S(260), S(46), Loc::Menu_Play(), mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, S(260), S(50), Loc::Menu_Play(), mPos, pressed, Ui::STYLE_GREEN);
         if(pressed) {
             state.isDailyRun = false;
             ResetGame();
@@ -147,31 +139,30 @@ void Game::DrawMenu(){
             }
             ChangeScreen(GameState::Screen::GAME);
         }
-        y += S(16);
-        
-        DrawLine((int)(uiCenterX - S(130)), y, (int)(uiCenterX + S(130)), y, Color{60,80,120,150});
-        y += S(12);
-        
+        y += P;
+        Ui::Divider(uiCenterX, (float)y, (float)S(130), P);
+        y += 5 * P;
+
         DailyChallenge today = state.dailyChallenge;
-        
         const char* challengeName = GetChallengeName(today.type);
-        char dailyTitle[128];
-        snprintf(dailyTitle, sizeof(dailyTitle), ">> %s <<", challengeName);
-        int dailyFont = S(16);
-        int ctw = MeasureText(dailyTitle, dailyFont);
-        DrawText(dailyTitle, (int)(uiCenterX - ctw/2), y, dailyFont, Color{255,180,80,255});
-        y += S(22);
-        
+        {
+            int k = Ui::FitK(challengeName, kB, panelW - S(60));
+            int ctw = Ui::Measure(challengeName, k);
+            int iw = Ui::IconW(Ui::ICON_CALENDAR) * P;
+            float x0 = std::floor(uiCenterX - (iw + 3 * P + ctw) / 2.f);
+            Ui::DrawIcon(Ui::ICON_CALENDAR, x0, y + Ui::GlyphHeight(k) / 2.f - Ui::IconH(Ui::ICON_CALENDAR) * P / 2.f, P);
+            Ui::Text(challengeName, x0 + iw + 3 * P, (float)y, k, Color{255, 170, 80, 255});
+            y += std::max(Ui::GlyphHeight(k), Ui::IconH(Ui::ICON_CALENDAR) * P) + 3 * P;
+        }
         const char* challengeDesc = GetChallengeDescription(today.type);
-        int cdw = MeasureText(challengeDesc, descFont);
-        DrawText(challengeDesc, (int)(uiCenterX - cdw/2), y, descFont, Color{150,150,170,255});
-        y += S(18);
-        
-        GuiButtonCentered(uiCenterX, y, S(260), S(40), Loc::Daily_Title(), mPos, pressed);
+        Ui::TextCentered(challengeDesc, uiCenterX, (float)y, Ui::FitK(challengeDesc, kS, panelW - S(20)), kMuted);
+        y += Ui::GlyphHeight(kS) + 4 * P;
+
+        GuiButtonCentered(uiCenterX, y, S(260), S(42), Loc::Daily_Title(), mPos, pressed);
         if(pressed) {
             state.isDailyRun = true;
             state.dailyChallenge = GetTodaysChallenge();
-            state.dailyChallenge.bestScore = LoadDailyHighScore("daily_highscore.txt", 
+            state.dailyChallenge.bestScore = LoadDailyHighScore("daily_highscore.txt",
                 state.dailyChallenge.year, state.dailyChallenge.month, state.dailyChallenge.day);
             state.difficulty = Difficulty::NORMAL;
             ResetGame();
@@ -179,60 +170,55 @@ void Game::DrawMenu(){
             state.paused = false;
             ChangeScreen(GameState::Screen::GAME);
         }
-        
+        y -= 2 * P;
 
         char dateStr[64];
         snprintf(dateStr, sizeof(dateStr), "%s %04d-%02d-%02d", Loc::Menu_Today(), today.year, today.month, today.day);
-        int dtw = MeasureText(dateStr, descFont);
-        DrawText(dateStr, (int)(uiCenterX - dtw/2), y + S(6), descFont, Color{100,100,120,255});
-        y += S(22);
-        
         if(today.bestScore > 0) {
-            char dailyBest[64];
-            snprintf(dailyBest, sizeof(dailyBest), "%s %d", Loc::Daily_Best(), today.bestScore);
-            int smallFont = S(13);
-            int dbw = MeasureText(dailyBest, smallFont);
-            DrawText(dailyBest, (int)(uiCenterX - dbw/2), y, smallFont, Color{100,200,255,255});
-            y += S(18);
+            char withBest[128];
+            snprintf(withBest, sizeof(withBest), "%s   %s %d", dateStr, Loc::Daily_Best(), today.bestScore);
+            Ui::TextCentered(withBest, uiCenterX, (float)y, kS, Color{110, 190, 255, 255});
+        } else {
+            Ui::TextCentered(dateStr, uiCenterX, (float)y, kS, kDim);
         }
-        y += S(10);
-        
-        DrawLine((int)(uiCenterX - S(130)), y, (int)(uiCenterX + S(130)), y, Color{60,80,120,150});
-        y += S(18);
-        
-        GuiButtonCentered(uiCenterX, y, S(180), S(36), Loc::Menu_Exit(), mPos, pressed);
+        y += Ui::GlyphHeight(kS) + 5 * P;
+        Ui::Divider(uiCenterX, (float)y, (float)S(130), P);
+        y += 5 * P;
+
+        // Coins and best score side by side
+        {
+            char hsText[64];
+            snprintf(hsText, sizeof(hsText), "%d", state.highScore);
+            int iw = Ui::IconW(Ui::ICON_CROWN) * P;
+            int hw = Ui::Measure(hsText, kB);
+            float colL = uiCenterX - S(70), colR = uiCenterX + S(70);
+            DrawCoinAmount(worldArt.items, colL, (float)y, state.globalCoins, kB, P);
+            float hx = std::floor(colR - (iw + 3 * P + hw) / 2.f);
+            Ui::DrawIcon(Ui::ICON_CROWN, hx, y + Ui::GlyphHeight(kB) / 2.f - Ui::IconH(Ui::ICON_CROWN) * P / 2.f, P);
+            Ui::Text(hsText, hx + iw + 3 * P, (float)y, kB, kGold);
+            y += Ui::GlyphHeight(kB) + 2 * P;
+            Ui::TextCentered(Loc::GameOver_Coins(), colL, (float)y, kS, kDim);
+            Ui::TextCentered(Loc::Menu_HighScore(), colR, (float)y, kS, kDim);
+            y += Ui::GlyphHeight(kS) + 5 * P;
+        }
+
+        GuiButtonCentered(uiCenterX, y, S(170), S(36), Loc::Menu_Exit(), mPos, pressed, Ui::STYLE_RED);
         if(pressed) running = false;
-        
-        y += S(40);
-        
-        int coinFont = S(16);
-        const char* coinsTxt = TextFormat("%s %d", Loc::GameOver_Coins(), state.globalCoins);
-        int coinsTxtW = MeasureText(coinsTxt, coinFont);
-        DrawCircle((int)(uiCenterX - coinsTxtW/2 - S(12)), y + S(8), Sf(8), GOLD);
-        DrawText(coinsTxt, (int)(uiCenterX - coinsTxtW/2), y, coinFont, GOLD);
-        y += S(24);
-        
-        char hsText[64];
-        snprintf(hsText, sizeof(hsText), "%s %d", Loc::Menu_HighScore(), state.highScore);
-        int hsFont = S(16);
-        int hsw = MeasureText(hsText, hsFont);
-        DrawText(hsText, (int)(uiCenterX - hsw/2), y, hsFont, Color{255,220,100,255});
     }
     else if(menuTab == 1) {
         Ui::DrawSectionHeader(y, uiCenterX, Loc::Video_Title(), uiScale);
-        y += S(8);
-        
-        DrawText(Loc::Video_Resolution(), (int)(uiCenterX - S(140)), y, S(13), Color{180,180,180,255});
-        y += S(18);
+
+        Ui::Text(Loc::Video_Resolution(), (float)Ui::RowX(uiCenterX, S(300), sw, uiScale), (float)y, kS, kMuted);
+        y += Ui::GlyphHeight(kS) + 2 * P;
         DrawResolutionSelector(y, uiCenterX, mPos, click, sw, uiScale);
-        y += S(8);
-        
+        y += 2 * P;
+
         Ui::DrawToggle(y, uiCenterX, Loc::Video_Fullscreen(), fullscreen, mPos, click, settingsChanged, sw, uiScale);
         if(settingsChanged) { ApplyResolution(false); settingsChanged = false; settingsDirty = true; }
-        
+
         bool vsyncChanged = false;
         Ui::DrawToggle(y, uiCenterX, Loc::Video_VSync(), settings.vsync, mPos, click, vsyncChanged, sw, uiScale);
-        if(vsyncChanged) { 
+        if(vsyncChanged) {
             if(settings.vsync) {
                 SetTargetFPS(GetMonitorRefreshRate(GetCurrentMonitor()));
             } else {
@@ -240,10 +226,10 @@ void Game::DrawMenu(){
             }
             settingsDirty = true;
         }
-        
-        y += S(5);
-        DrawText(Loc::Video_FPSLimit(), (int)(uiCenterX - S(140)), y, S(13), Color{180,180,180,255});
-        y += S(18);
+
+        y += 2 * P;
+        Ui::Text(Loc::Video_FPSLimit(), (float)Ui::RowX(uiCenterX, S(300), sw, uiScale), (float)y, kS, kMuted);
+        y += Ui::GlyphHeight(kS) + 2 * P;
         const char* fpsOptions[] = {"30", "60", "120", "144", "Max"};
         int fpsValues[] = {30, 60, 120, 144, 0};
         int fpsIndex = 1;
@@ -259,14 +245,13 @@ void Game::DrawMenu(){
             }
             settingsDirty = true;
         }
-        
+
         Ui::DrawToggle(y, uiCenterX, Loc::Video_ShowFPS(), settings.showFPS, mPos, click, settingsChanged, sw, uiScale);
         if(settingsChanged) { settingsDirty = true; settingsChanged = false; }
     }
     else if(menuTab == 2) {
         Ui::DrawSectionHeader(y, uiCenterX, Loc::Audio_Title(), uiScale);
-        y += S(8);
-        
+
         Ui::DrawSlider(y, uiCenterX, Loc::Audio_Master(), state.audio.masterSlider, mPos, drag, settingsChanged, sw, uiScale);
         Ui::DrawSlider(y, uiCenterX, Loc::Audio_Music(), state.audio.volMusic, mPos, drag, settingsChanged, sw, uiScale);
         Ui::DrawSlider(y, uiCenterX, Loc::Audio_Jump(), state.audio.volJump, mPos, drag, settingsChanged, sw, uiScale);
@@ -275,16 +260,16 @@ void Game::DrawMenu(){
         Ui::DrawSlider(y, uiCenterX, Loc::Audio_ThemeChange(), state.audio.volThemeChange, mPos, drag, settingsChanged, sw, uiScale);
         Ui::DrawSlider(y, uiCenterX, Loc::Audio_Coin(), state.audio.volCoin, mPos, drag, settingsChanged, sw, uiScale);
         Ui::DrawSlider(y, uiCenterX, Loc::Audio_PowerUp(), state.audio.volPowerUp, mPos, drag, settingsChanged, sw, uiScale);
-        
+
         if(settingsChanged) {
             settingsDirty = true;
             settingsSaveTimer = 0.f;
             ApplyAudioVolumes();
         }
-        
-        y += S(12);
+
+        y += 2 * P;
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, S(180), S(32), Loc::Audio_Default(), mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, S(180), S(34), Loc::Audio_Default(), mPos, pressed, Ui::STYLE_DARK);
         if(pressed) {
             state.audio.masterSlider = 0.5f;
             state.audio.volMusic = 0.5f;
@@ -300,47 +285,21 @@ void Game::DrawMenu(){
     }
     else if(menuTab == 3) {
         Ui::DrawSectionHeader(y, uiCenterX, Loc::Keys_Title(), uiScale);
-        y += S(8);
-        
+
         enum RebindTarget { RB_NONE, RB_LEFT, RB_RIGHT, RB_JUMP };
         static RebindTarget rebindActive = RB_NONE;
         static float blinkTime = 0.f;
         blinkTime += GetFrameTime();
         float blinkAlpha = (std::sin(blinkTime * 6.f) * 0.5f + 0.5f);
-        
-        auto DrawKeyBind = [&](const char* label, int &key, RebindTarget target) {
-            int boxW = S(280), boxH = S(36);
-            int boxX = (int)(uiCenterX - boxW/2);
-            
-            Rectangle rect{(float)boxX, (float)y, (float)boxW, (float)boxH};
-            bool hovered = CheckCollisionPointRec(mPos, rect);
-            bool active = (rebindActive == target);
-            
-            Color bgCol = active ? Color{80,60,100,255} : (hovered ? Color{50,60,80,255} : Color{40,50,65,255});
-            if(active) bgCol.a = (unsigned char)(180 + 75 * blinkAlpha);
-            DrawRectangleRec(rect, bgCol);
-            DrawRectangleLines(boxX, y, boxW, boxH, active ? Color{180,140,255,255} : Color{80,80,80,255});
-            
-            int labelFont = S(15);
-            DrawText(label, boxX + S(12), y + S(10), labelFont, RAYWHITE);
-            
-            int keyFont = S(16);
-            const char* keyName = active ? "..." : KeyName(key);
-            int knw = MeasureText(keyName, keyFont);
-            DrawRectangle(boxX + boxW - knw - S(25), y + S(7), knw + S(16), S(22), Color{30,35,45,255});
-            DrawText(keyName, boxX + boxW - knw - S(17), y + S(10), keyFont, active ? Color{255,200,100,255} : Color{150,200,255,255});
-            
-            if(click && hovered) {
+
+        auto keyRow = [&](const char* label, int key, RebindTarget target) {
+            if(Ui::DrawKeyRow(y, uiCenterX, label, KeyName(key), rebindActive == target, blinkAlpha, mPos, click, sw, uiScale))
                 rebindActive = (rebindActive == target) ? RB_NONE : target;
-            }
-            
-            y += boxH + S(6);
         };
-        
-        DrawKeyBind(Loc::Keys_MoveLeft(), state.keys.left, RB_LEFT);
-        DrawKeyBind(Loc::Keys_MoveRight(), state.keys.right, RB_RIGHT);
-        DrawKeyBind(Loc::Keys_Jump(), state.keys.jump, RB_JUMP);
-        
+        keyRow(Loc::Keys_MoveLeft(), state.keys.left, RB_LEFT);
+        keyRow(Loc::Keys_MoveRight(), state.keys.right, RB_RIGHT);
+        keyRow(Loc::Keys_Jump(), state.keys.jump, RB_JUMP);
+
         if(rebindActive != RB_NONE) {
             for(int k = 32; k < 350; k++) {
                 if(IsKeyPressed(k)) {
@@ -352,12 +311,12 @@ void Game::DrawMenu(){
                     break;
                 }
             }
-            DrawText(Loc::Keys_PressKey(), (int)(uiCenterX - S(60)), y + S(10), S(14), Color{255,200,100,255});
+            Ui::TextCentered(Loc::Keys_PressKey(), uiCenterX, (float)(y + 2 * P), kB, Color{255, 200, 100, (unsigned char)(150 + 105 * blinkAlpha)});
         }
-        
-        y += S(25);
+
+        y += S(34);
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, S(180), S(32), Loc::Keys_Default(), mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, S(180), S(34), Loc::Keys_Default(), mPos, pressed, Ui::STYLE_DARK);
         if(pressed) {
             state.keys.left = KEY_A;
             state.keys.right = KEY_D;
@@ -367,27 +326,26 @@ void Game::DrawMenu(){
     }
     else if(menuTab == 4) {
         Ui::DrawSectionHeader(y, uiCenterX, Loc::Effects_Title(), uiScale);
-        y += S(8);
-        
+
         bool shakeChanged = false;
         Ui::DrawToggle(y, uiCenterX, Loc::Effects_ScreenShake(), settings.screenShake, mPos, click, shakeChanged, sw, uiScale);
         if(shakeChanged) settingsDirty = true;
-        
+
         bool partChanged = false;
         Ui::DrawToggle(y, uiCenterX, Loc::Effects_Particles(), settings.particles, mPos, click, partChanged, sw, uiScale);
         if(partChanged) settingsDirty = true;
-        
+
         bool comboChanged = false;
         Ui::DrawToggle(y, uiCenterX, Loc::Effects_ComboFire(), settings.comboEffects, mPos, click, comboChanged, sw, uiScale);
         if(comboChanged) settingsDirty = true;
-        
+
         bool powerUpChanged = false;
         Ui::DrawToggle(y, uiCenterX, Loc::Effects_PowerUp(), settings.powerUpEffects, mPos, click, powerUpChanged, sw, uiScale);
         if(powerUpChanged) settingsDirty = true;
-        
-        y += S(25);
+
+        y += S(20);
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, S(180), S(32), Loc::Effects_ResetAll(), mPos, pressed);
+        GuiButtonCentered(uiCenterX, y, S(200), S(34), Loc::Effects_ResetAll(), mPos, pressed, Ui::STYLE_RED);
         if(pressed) {
             ResetSettingsToDefaults();
         }
@@ -397,107 +355,91 @@ void Game::DrawMenu(){
     }
     else if(menuTab == 5) {
         static int statsSubTab = 0;
-        int subW = S(85), subH = S(24);
-        int subGap = S(3);
-        float subStartX = uiCenterX - (3 * subW + 2 * subGap) / 2.f;
+        int subW = std::min(S(100), (panelW - S(24)) / 3), subH = S(30);
+        int subGap = 2 * P;
+        float subStartX = std::floor(uiCenterX - (3 * subW + 2 * subGap) / 2.f);
         if(Ui::DrawTabButton(subStartX, y, subW, subH, Loc::Stats_SubAchievements(), 0, statsSubTab, mPos, click, uiScale)) statsSubTab = 0;
         if(Ui::DrawTabButton(subStartX + (subW+subGap), y, subW, subH, Loc::Stats_SubLeaderboard(), 1, statsSubTab, mPos, click, uiScale)) statsSubTab = 1;
         if(Ui::DrawTabButton(subStartX + 2*(subW+subGap), y, subW, subH, Loc::Stats_SubStats(), 2, statsSubTab, mPos, click, uiScale)) statsSubTab = 2;
-        y += subH + S(12);
-        
+        y += subH + 5 * P;
+
+        int rowW = std::min(S(320), panelW - S(24));
+        int rowX = (int)std::floor(uiCenterX - rowW / 2.f);
+        int listBottom = (int)(panel.y + panel.height) - S(14);
+
         if(statsSubTab == 0) {
-            Ui::DrawSectionHeader(y, uiCenterX, Loc::Stats_Achievements(), uiScale);
-            y += S(6);
-            
             int achUnlocked = 0;
             for (auto &ach : state.achievements) if (ach.unlocked) achUnlocked++;
             char achCount[64];
             snprintf(achCount, sizeof(achCount), "%d/%d %s", achUnlocked, (int)state.achievements.size(), Loc::Stats_AchUnlocked());
-            int acw = MeasureText(achCount, S(13));
-            DrawText(achCount, (int)(uiCenterX - acw/2), y, S(13), Color{255, 200, 80, 255});
-            y += S(18);
-            
+            Ui::TextCentered(achCount, uiCenterX, (float)y, kB, kGold);
+            y += Ui::GlyphHeight(kB) + 3 * P;
+            Ui::Bar({(float)rowX, (float)y, (float)rowW, (float)(4 * P)}, P,
+                    state.achievements.empty() ? 0.f : (float)achUnlocked / state.achievements.size(), Color{232, 184, 72, 255});
+            y += 7 * P;
+
+            int rowH = Ui::GlyphHeight(kB) + Ui::GlyphHeight(kS) + 7 * P;
             for (auto &ach : state.achievements) {
-                int rowW = S(280), rowH = S(26);
-                int rowX = (int)(uiCenterX - rowW/2);
-                if(rowX < S(10)) rowX = S(10);
-                if(rowX + rowW > sw - S(10)) rowX = sw - S(10) - rowW;
-                
-                Color bg = ach.unlocked ? Color{25, 45, 30, 255} : Color{35, 35, 45, 255};
-                DrawRectangle(rowX, y, rowW, rowH, bg);
-                DrawRectangleLines(rowX, y, rowW, rowH, ach.unlocked ? Color{60, 120, 60, 200} : Color{50, 50, 60, 200});
-                
-                const char *icon = ach.unlocked ? "*" : "-";
-                DrawText(icon, rowX + S(6), y + S(6), S(14), ach.unlocked ? Color{255, 200, 80, 255} : Color{80, 80, 80, 255});
-                
-                DrawText(ach.name.c_str(), rowX + S(22), y + S(3), S(12), ach.unlocked ? RAYWHITE : Color{120, 120, 120, 255});
-                DrawText(ach.description.c_str(), rowX + S(22), y + S(14), S(10), ach.unlocked ? Color{170, 170, 170, 255} : Color{70, 70, 70, 255});
-                
-                y += rowH + S(4);
-                if(y > sh - S(80)) break;
+                if(y + rowH > listBottom) break;
+                Rectangle row{(float)rowX, (float)y, (float)rowW, (float)rowH};
+                if(ach.unlocked) Ui::Frame(row, P, {30, 52, 44, 255}, {62, 104, 80, 255}, {16, 30, 26, 255}, {6, 6, 14, 255});
+                else Ui::Frame(row, P, {28, 30, 46, 255}, {44, 48, 70, 255}, {16, 18, 30, 255}, {6, 6, 14, 255});
+                Ui::Icon ic = ach.unlocked ? Ui::ICON_STAR : Ui::ICON_LOCK;
+                Ui::DrawIconCentered(ic, row.x + 9 * P, row.y + rowH / 2.f, P, ach.unlocked ? WHITE : Color{120, 120, 140, 255});
+                float tx = row.x + 18 * P;
+                int maxW = rowW - 21 * P;
+                Ui::Text(ach.name.c_str(), tx, row.y + 3 * P, Ui::FitK(ach.name.c_str(), kB, maxW), ach.unlocked ? RAYWHITE : kDim);
+                Ui::Text(ach.description.c_str(), tx, row.y + 4 * P + Ui::GlyphHeight(kB), Ui::FitK(ach.description.c_str(), kS, maxW),
+                         ach.unlocked ? Color{170, 200, 180, 255} : Color{80, 84, 104, 255});
+                y += rowH + 2 * P;
             }
         }
         else if(statsSubTab == 1) {
-            Ui::DrawSectionHeader(y, uiCenterX, Loc::Stats_Leaderboard(), uiScale);
-            y += S(6);
-            
-            int hdrFont = S(12);
-            int hdrW = MeasureText(Loc::Stats_LBHeader(), hdrFont);
-            DrawText(Loc::Stats_LBHeader(), (int)(uiCenterX - hdrW/2), y, hdrFont, Color{100, 160, 220, 255});
-            y += S(18);
-            
+            Ui::TextCentered(Loc::Stats_LBHeader(), uiCenterX, (float)y, kS, Color{110, 170, 230, 255});
+            y += Ui::GlyphHeight(kS) + 4 * P;
+
             int shown = 0;
+            int rowH = Ui::GlyphHeight(kB) + 6 * P;
             for (auto &e : state.leaderboard.entries) {
-                if(shown >= 10) break;
-                char line[128];
-                snprintf(line, sizeof(line), "%d.  %d   %d   x%d%s", shown + 1, e.score, e.coins, e.combo, e.isDaily ? " [D]" : "");
-                int lineFont = S(13);
-                int lineW = MeasureText(line, lineFont);
-                int lineX = (int)(uiCenterX - lineW/2);
-                if(lineX < S(10)) lineX = S(10);
-                
-                int rowW = S(280), rowH = S(22);
-                int rowX = (int)(uiCenterX - rowW/2);
-                if(rowX < S(10)) rowX = S(10);
-                if(rowX + rowW > sw - S(10)) rowX = sw - S(10) - rowW;
-                Color rowBg = (shown % 2 == 0) ? Color{25, 30, 45, 255} : Color{30, 35, 50, 255};
-                DrawRectangle(rowX, y, rowW, rowH, rowBg);
-                
-                Color lineCol = (shown == 0) ? Color{255, 215, 80, 255} : (shown == 1) ? Color{200, 200, 210, 255} : (shown == 2) ? Color{180, 130, 80, 255} : Color{160, 160, 170, 255};
-                DrawText(line, lineX, y + S(3), lineFont, lineCol);
-                y += rowH + S(3);
+                if(shown >= 10 || y + rowH > listBottom) break;
+                Rectangle row{(float)rowX, (float)y, (float)rowW, (float)rowH};
+                Color fill = (shown % 2 == 0) ? Color{30, 34, 56, 255} : Color{26, 30, 48, 255};
+                Ui::Frame(row, P, fill, {48, 54, 84, 255}, {16, 18, 32, 255}, {6, 6, 14, 255});
+                Color rankCol = (shown == 0) ? Color{255, 215, 80, 255} : (shown == 1) ? Color{210, 214, 226, 255}
+                              : (shown == 2) ? Color{214, 140, 80, 255} : kMuted;
+                float ty = row.y + 3 * P;
+                if(shown == 0) Ui::DrawIconCentered(Ui::ICON_CROWN, row.x + 9 * P, row.y + rowH / 2.f, P);
+                else Ui::TextCentered(TextFormat("%d", shown + 1), row.x + 9 * P, ty, kB, rankCol);
+                Ui::Text(TextFormat("%d", e.score), row.x + 20 * P, ty, kB, rankCol);
+                const char *right = TextFormat("x%d  %d%s", e.combo, e.coins, e.isDaily ? "  D" : "");
+                int rw = Ui::Measure(right, kS);
+                Ui::Text(right, row.x + rowW - rw - 5 * P, ty + (Ui::GlyphHeight(kB) - Ui::GlyphHeight(kS)) / 2.f, kS, kMuted);
+                y += rowH + P;
                 shown++;
             }
             if(shown == 0) {
                 const char *empty = Loc::GetLanguage() == Language::EN ? "No entries yet" : "Brak wynikow";
-                int ew = MeasureText(empty, S(14));
-                DrawText(empty, (int)(uiCenterX - ew/2), y, S(14), Color{100, 100, 110, 255});
+                Ui::TextCentered(empty, uiCenterX, (float)(y + S(20)), kB, kDim);
             }
         }
         else if(statsSubTab == 2) {
-            Ui::DrawSectionHeader(y, uiCenterX, Loc::GetLanguage() == Language::EN ? "Statistics" : "Statystyki", uiScale);
-            y += S(8);
-            
-            int statFont = S(14);
-            int statValFont = S(14);
+            int rowH = Ui::GlyphHeight(kB) + 6 * P;
             auto drawStatRow = [&](const char *label, const char *valStr, Color valCol = Color{255, 220, 140, 255}) {
-                int rowW2 = S(260), rowH2 = S(24);
-                int rowX2 = (int)(uiCenterX - rowW2/2);
-                if(rowX2 < S(10)) rowX2 = S(10);
-                if(rowX2 + rowW2 > sw - S(10)) rowX2 = sw - S(10) - rowW2;
-                DrawRectangle(rowX2, y, rowW2, rowH2, Color{30, 35, 50, 255});
-                DrawText(label, rowX2 + S(10), y + S(5), statFont, Color{180, 180, 190, 255});
-                int vw = MeasureText(valStr, statValFont);
-                DrawText(valStr, rowX2 + rowW2 - vw - S(10), y + S(5), statValFont, valCol);
-                y += rowH2 + S(3);
+                if(y + rowH > listBottom) return;
+                Rectangle row{(float)rowX, (float)y, (float)rowW, (float)rowH};
+                Ui::Frame(row, P, {28, 32, 52, 255}, {48, 54, 84, 255}, {16, 18, 32, 255}, {6, 6, 14, 255});
+                int vw = Ui::Measure(valStr, kB);
+                Ui::Text(label, row.x + 4 * P, row.y + 3 * P, Ui::FitK(label, kB, rowW - vw - 12 * P), Color{186, 190, 210, 255});
+                Ui::Text(valStr, row.x + rowW - vw - 4 * P, row.y + 3 * P, kB, valCol);
+                y += rowH + P;
             };
-            
+
             int mins = (int)(state.stats.totalPlayTime) / 60;
             int hrs = mins / 60;
             char timeStr[32];
             if(hrs > 0) snprintf(timeStr, sizeof(timeStr), "%dh %dm", hrs, mins % 60);
             else snprintf(timeStr, sizeof(timeStr), "%dm %ds", mins, (int)state.stats.totalPlayTime % 60);
-            
+
             char buf[32];
             snprintf(buf, sizeof(buf), "%d", state.stats.gamesPlayed);
             drawStatRow(Loc::Stats_GamesPlayed(), buf);
@@ -524,82 +466,56 @@ void Game::DrawMenu(){
             drawStatRow(Loc::Stats_PlayTime(), timeStr, Color{150, 200, 255, 255});
         }
     }
-    
+
+    contentBottom[menuTab] = y;
     ApplyMenuAudioVolumes();
-    
-    {
-        static bool langBoxOpen = false;
-        int boxW = S(90), boxH = S(26);
-        int boxX = sw - boxW - S(10);
-        int boxY = sh - boxH - S(45);
-        
-        const char* langLabel = (settings.language == 0) ? "EN" : "PL";
-        Rectangle boxRect{(float)boxX, (float)boxY, (float)boxW, (float)boxH};
-        bool hovered = CheckCollisionPointRec(mPos, boxRect);
-        
-        DrawRectangleRec(boxRect, hovered ? Color{60,70,90,255} : Color{40,50,65,255});
-        DrawRectangleLines(boxX, boxY, boxW, boxH, Color{80,100,130,255});
-        
-        int iconX = boxX + S(12);
-        int iconY = boxY + boxH/2;
-        DrawCircleLines(iconX, iconY, Sf(8), Color{150,180,220,255});
-        DrawLine(iconX - S(8), iconY, iconX + S(8), iconY, Color{150,180,220,255});
-        DrawLine(iconX, iconY - S(8), iconX, iconY + S(8), Color{150,180,220,255});
-        
-        int langFont = S(14);
-        int ltw = MeasureText(langLabel, langFont);
-        DrawText(langLabel, boxX + S(30), boxY + S(6), langFont, RAYWHITE);
-        
-        int arrowX = boxX + boxW - S(18);
-        int arrowY = boxY + boxH/2;
-        int arrowSize = S(5);
-        if(langBoxOpen) {
-            DrawTriangle({(float)(arrowX-arrowSize), (float)(arrowY+S(3))}, {(float)(arrowX+arrowSize), (float)(arrowY+S(3))}, {(float)arrowX, (float)(arrowY-S(4))}, Color{180,180,180,255});
-        } else {
-            DrawTriangle({(float)(arrowX-arrowSize), (float)(arrowY-S(3))}, {(float)(arrowX+arrowSize), (float)(arrowY-S(3))}, {(float)arrowX, (float)(arrowY+S(4))}, Color{180,180,180,255});
-        }
-        
-        if(click && hovered) langBoxOpen = !langBoxOpen;
-        
-        if(langBoxOpen) {
-            int optH = S(28);
-            int dropY = boxY - optH * 2 - S(4);
-            
-            Rectangle optEN{(float)boxX, (float)dropY, (float)boxW, (float)optH};
-            bool hovEN = CheckCollisionPointRec(mPos, optEN);
-            DrawRectangleRec(optEN, hovEN ? Color{70,90,120,255} : Color{50,60,80,255});
-            DrawRectangleLines(boxX, dropY, boxW, optH, Color{80,100,130,255});
-            DrawText("English", boxX + S(10), dropY + S(6), langFont, settings.language == 0 ? Color{100,200,150,255} : RAYWHITE);
-            if(click && hovEN) {
-                settings.language = 0;
-                Loc::SetLanguage(Language::EN);
-                settingsDirty = true;
-                langBoxOpen = false;
-            }
-            
-            Rectangle optPL{(float)boxX, (float)(dropY + optH + S(2)), (float)boxW, (float)optH};
-            bool hovPL = CheckCollisionPointRec(mPos, optPL);
-            DrawRectangleRec(optPL, hovPL ? Color{70,90,120,255} : Color{50,60,80,255});
-            DrawRectangleLines(boxX, dropY + optH + S(2), boxW, optH, Color{80,100,130,255});
-            DrawText("Polski", boxX + S(10), dropY + optH + S(8), langFont, settings.language == 1 ? Color{100,200,150,255} : RAYWHITE);
-            if(click && hovPL) {
-                settings.language = 1;
-                Loc::SetLanguage(Language::PL);
-                settingsDirty = true;
-                langBoxOpen = false;
-            }
-            
-            if(click && !hovered && !hovEN && !hovPL) langBoxOpen = false;
-        }
-    }
-    
-    DrawText(Loc::Settings_TabHint(), (int)(uiCenterX - S(70)), sh - S(35), S(11), Color{70,70,90,255});
-    
+
+    // Footer: tab hint, version, language picker
+    Ui::Text(Loc::Settings_TabHint(), (float)S(10), (float)(sh - S(30)), kS, Color{120, 126, 156, 200});
+    Ui::Text("v1.6", (float)S(10), (float)(sh - S(30) + Ui::GlyphHeight(kS) + 2 * P), kS, Color{80, 86, 110, 200});
+    DrawLanguageBox(mPos, click, sw, sh, uiScale);
+
     if(IsKeyPressed(KEY_TAB)) {
         menuTab = (menuTab + 1) % 7;
     }
-    
+
     EndDrawing();
+}
+
+void Game::DrawLanguageBox(Vector2 mPos, bool click, int sw, int sh, float scale) {
+    static bool langBoxOpen = false;
+    int p = Ui::UnitFor(scale);
+    int k = Ui::TextKFor(scale);
+    int boxW = (int)(96 * scale), boxH = (int)(32 * scale);
+    int boxX = sw - boxW - (int)(10 * scale);
+    int boxY = sh - boxH - (int)(8 * scale);
+    Rectangle boxRect{(float)boxX, (float)boxY, (float)boxW, (float)boxH};
+    bool hovered = CheckCollisionPointRec(mPos, boxRect);
+    Ui::Frame(boxRect, p, hovered ? Color{50, 58, 90, 255} : Color{32, 36, 58, 255}, {70, 80, 120, 255}, {18, 20, 38, 255}, {6, 6, 14, 255});
+    Ui::DrawIconCentered(Ui::ICON_GLOBE, boxX + 8.f * p, boxY + boxH / 2.f, p);
+    Ui::Text(settings.language == 0 ? "EN" : "PL", (float)(boxX + 16 * p), (float)(boxY + boxH / 2 - Ui::GlyphHeight(k) / 2), k, RAYWHITE);
+    Ui::DrawIconCentered(langBoxOpen ? Ui::ICON_ARROW_L : Ui::ICON_ARROW_R, (float)(boxX + boxW - 5 * p), boxY + boxH / 2.f, std::max(1, p / 2));
+    if(click && hovered) { langBoxOpen = !langBoxOpen; return; }
+    if(!langBoxOpen) return;
+
+    const char *names[2] = {"English", "Polski"};
+    int optH = boxH;
+    int optW = boxW + (int)(20 * scale);
+    int dropX = sw - optW - (int)(10 * scale);
+    bool anyHover = false;
+    for(int i = 0; i < 2; i++) {
+        Rectangle opt{(float)dropX, (float)(boxY - (2 - i) * (optH + p) - p), (float)optW, (float)optH};
+        bool sel = settings.language == i;
+        bool hov = CheckCollisionPointRec(mPos, opt);
+        anyHover |= hov;
+        if(Ui::Button(opt, names[i], mPos, click, sel ? Ui::STYLE_BLUE : Ui::STYLE_DARK, k)) {
+            settings.language = i;
+            Loc::SetLanguage(i == 0 ? Language::EN : Language::PL);
+            settingsDirty = true;
+            langBoxOpen = false;
+        }
+    }
+    if(click && !anyHover) langBoxOpen = false;
 }
 
 void Game::DrawHeroTab(int &y, float uiCenterX, Vector2 mPos, bool click) {
@@ -607,56 +523,58 @@ void Game::DrawHeroTab(int &y, float uiCenterX, Vector2 mPos, bool click) {
     if(preview < 0) preview = state.skins.selected;
 
     Ui::DrawSectionHeader(y, uiCenterX, Loc::Hero_Title(), uiScale);
-    y += S(6);
 
-    // Showcase: the hero idles, then runs, on a pixel platform
-    int panelW = S(300), panelH = S(210);
-    Rectangle panel{uiCenterX - panelW/2.f, (float)y, (float)panelW, (float)panelH};
-    DrawRectangleRec(panel, Color{16,22,34,255});
-    DrawRectangleLinesEx(panel, (float)S(2), Color{50,70,100,255});
+    // Showcase: the hero idles, then runs, on a pixel platform in front of the tower backdrop
+    int panelW = S(300), panelH = S(190);
+    Rectangle stage{std::floor(uiCenterX - panelW / 2.f), (float)y, (float)panelW, (float)panelH};
+    Ui::Inset(stage, P, {14, 18, 32, 255});
+    if(worldArt.biome[BIOME_DEFAULT].id > 0) {
+        BeginScissorMode((int)stage.x + P, (int)stage.y + P, (int)stage.width - 2 * P, (int)stage.height - 2 * P);
+        WorldArt::DrawSky(worldArt, 0, GetScreenWidth(), GetScreenHeight(), Color{255, 255, 255, 255});
+        const Texture2D &bg = worldArt.biome[BIOME_DEFAULT];
+        float s = std::max(1.f, std::floor(stage.width / 240.f));
+        float bgH = 400.f * s;
+        for(int layer = 0; layer < 3; layer++)
+            DrawTexturePro(bg, {layer * 240.f, 0, 240.f, 400.f},
+                           {uiCenterX - 120.f * s, stage.y + stage.height - bgH * 0.55f, 240.f * s, bgH}, {0, 0}, 0.f,
+                           Color{150, 150, 180, 255});
+        EndScissorMode();
+    }
     float t = (float)GetTime();
     bool running = std::fmod(t, 6.f) > 3.f;
     float px = std::floor(uiCenterX / 2.f) * 2.f;
-    float groundY = std::floor((panel.y + panelH - S(46)) / 2.f) * 2.f;
+    float groundY = std::floor((stage.y + panelH - S(40)) / 2.f) * 2.f;
     if(worldArt.loaded){
         float tileW = (float)S(200);
         WorldArt::DrawPlatform(worldArt, {px - tileW/2.f, groundY, tileW, 18.f}, BIOME_DEFAULT, WHITE);
     }
     DrawPlayerPreview({px, groundY}, std::floor(4.f * uiScale), preview, t, running);
 
-    int arrowW = S(34), arrowH = S(60);
-    Rectangle left{panel.x + S(8), panel.y + panelH/2.f - arrowH/2.f, (float)arrowW, (float)arrowH};
-    Rectangle right{panel.x + panelW - S(8) - arrowW, left.y, (float)arrowW, (float)arrowH};
-    auto arrow = [&](Rectangle r, const char* txt){
-        bool hov = CheckCollisionPointRec(mPos, r);
-        DrawRectangleRec(r, hov ? Color{60,90,140,255} : Color{35,45,60,255});
-        int f = S(24); int w = MeasureText(txt, f);
-        DrawText(txt, (int)(r.x + r.width/2 - w/2), (int)(r.y + r.height/2 - f/2), f, RAYWHITE);
-        return hov && click;
-    };
-    if(arrow(left, "<") || IsKeyPressed(KEY_LEFT)) preview = (preview + SKIN_COUNT - 1) % SKIN_COUNT;
-    if(arrow(right, ">") || IsKeyPressed(KEY_RIGHT)) preview = (preview + 1) % SKIN_COUNT;
-    y += panelH + S(10);
+    int arrowW = S(36), arrowH = S(56);
+    Rectangle left{stage.x + 3 * P, stage.y + panelH / 2.f - arrowH / 2.f, (float)arrowW, (float)arrowH};
+    Rectangle right{stage.x + panelW - 3 * P - arrowW, left.y, (float)arrowW, (float)arrowH};
+    if(Ui::Button(left, "<", mPos, click, Ui::STYLE_DARK, kB + 1) || IsKeyPressed(KEY_LEFT)) preview = (preview + SKIN_COUNT - 1) % SKIN_COUNT;
+    if(Ui::Button(right, ">", mPos, click, Ui::STYLE_DARK, kB + 1) || IsKeyPressed(KEY_RIGHT)) preview = (preview + 1) % SKIN_COUNT;
+    y += panelH + 4 * P;
 
     const SkinInfo &info = kSkins[preview];
-    int nameFont = S(24);
-    int nw = MeasureText(info.name, nameFont);
-    DrawText(info.name, (int)(uiCenterX - nw/2), y, nameFont, RAYWHITE);
-    y += nameFont + S(10);
+    Ui::TextCentered(info.name, uiCenterX, (float)y, kB + 1, RAYWHITE);
+    y += Ui::GlyphHeight(kB + 1) + 5 * P;
 
     bool owned = state.skins.Owns(preview);
     bool equipped = owned && state.skins.selected == preview;
+    bool affordable = state.globalCoins >= info.price;
     char label[64];
     if(equipped) snprintf(label, sizeof(label), "%s", Loc::Hero_Equipped());
     else if(owned) snprintf(label, sizeof(label), "%s", Loc::Hero_Equip());
     else snprintf(label, sizeof(label), "%s  %d", Loc::Hero_Buy(), info.price);
-    bool pressed = false;
-    GuiButtonCentered(uiCenterX, y, S(220), S(40), label, mPos, pressed);
-    if(pressed && !equipped){
+    Rectangle btn{std::floor(uiCenterX - S(110)), (float)y, (float)S(220), (float)S(42)};
+    Ui::Style st = equipped ? Ui::STYLE_DARK : (owned ? Ui::STYLE_GREEN : Ui::STYLE_GOLD);
+    if(Ui::Button(btn, label, mPos, click, st, 0, !equipped && (owned || affordable))){
         if(owned){
             state.skins.selected = preview;
             SaveSkins("skins.txt", state.skins);
-        } else if(state.globalCoins >= info.price){
+        } else {
             state.globalCoins -= info.price;
             state.skins.owned |= (1u << preview);
             state.skins.selected = preview;
@@ -665,33 +583,35 @@ void Game::DrawHeroTab(int &y, float uiCenterX, Vector2 mPos, bool click) {
             if(state.audio.sndPowerUp.frameCount>0) PlaySound(state.audio.sndPowerUp);
         }
     }
-    if(!owned && state.globalCoins < info.price){
-        const char* msg = Loc::Hero_NotEnough();
-        int mf = S(12); int mw = MeasureText(msg, mf);
-        DrawText(msg, (int)(uiCenterX - mw/2), y - S(10), mf, Color{220,110,90,255});
+    if(equipped) Ui::DrawIconCentered(Ui::ICON_CHECK, btn.x + btn.width - 8 * P, btn.y + btn.height / 2.f + P, P);
+    y += S(42) + 3 * P;
+    if(!owned && !affordable){
+        Ui::TextCentered(Loc::Hero_NotEnough(), uiCenterX, (float)y, kS, Color{230, 110, 90, 255});
     }
-    y += S(14);
+    y += Ui::GlyphHeight(kS) + 3 * P;
 
-    // Thumbnail strip of every skin; locked ones are dimmed
-    float thumbScale = 1.5f * uiScale;
-    float cellW = 32.f * thumbScale + S(4);
-    float stripX = uiCenterX - cellW * SKIN_COUNT / 2.f;
+    // Thumbnail strip of every skin; locked ones are dimmed with a padlock
+    int thumbP = std::max(1, P / 2 + (P % 2));
+    float cellW = 32.f * thumbP + 4 * P;
+    float cellH = 40.f * thumbP + 4 * P;
+    float gap = (float)P;
+    float stripW = cellW * SKIN_COUNT + gap * (SKIN_COUNT - 1);
+    float stripX = std::floor(uiCenterX - stripW / 2.f);
     for(int i = 0; i < SKIN_COUNT; i++){
-        Rectangle cell{stripX + i * cellW, (float)y, cellW - S(4), 40.f * thumbScale + S(4)};
+        Rectangle cell{stripX + i * (cellW + gap), (float)y, cellW, cellH};
         bool hov = CheckCollisionPointRec(mPos, cell);
-        Color bg = (i == preview) ? Color{60,120,180,255} : (hov ? Color{45,60,85,255} : Color{28,36,50,255});
-        DrawRectangleRec(cell, bg);
-        if(i == state.skins.selected) DrawRectangleLinesEx(cell, 2.f, Color{255,210,90,255});
+        Color fill = (i == preview) ? Color{58, 92, 172, 255} : (hov ? Color{44, 52, 84, 255} : Color{26, 30, 48, 255});
+        Color outline = (i == state.skins.selected) ? Color{255, 206, 72, 255} : Color{6, 6, 14, 255};
+        Ui::Frame(cell, P, fill, {70, 80, 120, 255}, {16, 18, 32, 255}, outline);
         Texture2D tex = PlayerFrame(i, 0);
-        Color tint = state.skins.Owns(i) ? WHITE : Color{70,70,80,255};
+        bool own = state.skins.Owns(i);
         DrawTexturePro(tex, {0,0,(float)tex.width,(float)tex.height},
-                       {cell.x + S(2), cell.y + S(2), 32.f * thumbScale, 40.f * thumbScale}, {0,0}, 0.f, tint);
+                       {cell.x + 2 * P, cell.y + 2 * P, 32.f * thumbP, 40.f * thumbP}, {0,0}, 0.f, own ? WHITE : Color{60, 60, 76, 255});
+        if(!own) Ui::DrawIconCentered(Ui::ICON_LOCK, cell.x + cellW / 2.f, cell.y + cellH / 2.f, std::max(1, P / 2));
         if(hov && click) preview = i;
     }
-    y += (int)(40.f * thumbScale) + S(16);
+    y += (int)cellH + 5 * P;
 
-    int coinFont = S(16);
-    const char* coinsTxt = TextFormat("%s %d", Loc::GameOver_Coins(), state.globalCoins);
-    int cw = MeasureText(coinsTxt, coinFont);
-    DrawText(coinsTxt, (int)(uiCenterX - cw/2), y, coinFont, GOLD);
+    DrawCoinAmount(worldArt.items, uiCenterX, (float)y, state.globalCoins, kB, P);
+    y += Ui::GlyphHeight(kB);
 }
