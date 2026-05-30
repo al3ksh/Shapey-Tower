@@ -128,7 +128,7 @@ void Game::DrawMenu(){
         y += Ui::GlyphHeight(kS) + 5 * P;
 
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, S(260), S(50), Loc::Menu_Play(), mPos, pressed, Ui::STYLE_GREEN);
+        GuiButtonCentered(uiCenterX, y, S(260), S(50), Loc::Menu_Play(), mPos, pressed, Ui::STYLE_GREEN, kB + 1);
         if(pressed) {
             state.isDailyRun = false;
             ResetGame();
@@ -559,7 +559,10 @@ void Game::DrawHeroTab(int &y, float uiCenterX, Vector2 mPos, bool click) {
 
     const SkinInfo &info = kSkins[preview];
     Ui::TextCentered(info.name, uiCenterX, (float)y, kB + 1, RAYWHITE);
-    y += Ui::GlyphHeight(kB + 1) + 5 * P;
+    y += Ui::GlyphHeight(kB + 1) + 3 * P;
+    const char *desc = Loc::GetLanguage() == Language::EN ? info.descEN : info.descPL;
+    Ui::TextCentered(desc, uiCenterX, (float)y, Ui::FitK(desc, kS, S(340)), kMuted);
+    y += Ui::GlyphHeight(kS) + 4 * P;
 
     bool owned = state.skins.Owns(preview);
     bool equipped = owned && state.skins.selected == preview;
@@ -591,7 +594,10 @@ void Game::DrawHeroTab(int &y, float uiCenterX, Vector2 mPos, bool click) {
     y += Ui::GlyphHeight(kS) + 3 * P;
 
     // Thumbnail strip of every skin; locked ones are dimmed with a padlock
+    // Largest integer thumbnail scale whose strip still fits inside the content panel
+    int stripMax = std::min(GetScreenWidth() - S(16), S(380)) - S(20);
     int thumbP = std::max(1, P / 2 + (P % 2));
+    while(thumbP > 1 && (32 * thumbP + 5 * P) * SKIN_COUNT > stripMax) thumbP--;
     float cellW = 32.f * thumbP + 4 * P;
     float cellH = 40.f * thumbP + 4 * P;
     float gap = (float)P;

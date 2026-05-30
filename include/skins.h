@@ -5,10 +5,18 @@
 struct SkinInfo {
     const char *name;
     int price;
+    const char *descEN;
+    const char *descPL;
 };
 
 inline constexpr SkinInfo kSkins[] = {
-    {"The Shape", 0}, {"Ember", 60}, {"Frost", 120}, {"Toxic", 180}, {"Royal", 300}, {"Bone", 500}, {"Glitch", 800},
+    {"The Shape", 0, "The original masked climber", "Oryginalny zamaskowany wspinacz"},
+    {"Ember", 60, "Flaming crest, burning eyes", "Plonacy grzebien, zarzace oczy"},
+    {"Frost", 120, "Icicle crown and frozen gear", "Korona z sopli, zamarzniety stroj"},
+    {"Toxic", 180, "Gas mask and a glowing tank", "Maska gazowa i swiecacy zbiornik"},
+    {"Royal", 300, "Gold crown and a royal cape", "Zlota korona i krolewska peleryna"},
+    {"Bone", 500, "Skull face, ribs on show", "Czaszka zamiast twarzy i zebra"},
+    {"Glitch", 800, "Corrupted visor, broken signal", "Uszkodzony wizjer, zerwany sygnal"},
 };
 inline constexpr int SKIN_COUNT = (int)(sizeof(kSkins) / sizeof(kSkins[0]));
 

@@ -96,7 +96,7 @@ void Game::DrawPause(){
         }
 
         bool pressed = false;
-        GuiButtonCentered(uiCenterX, y, S(250), S(48), Loc::Pause_Resume(), mPos, pressed, Ui::STYLE_GREEN);
+        GuiButtonCentered(uiCenterX, y, S(250), S(48), Loc::Pause_Resume(), mPos, pressed, Ui::STYLE_GREEN, kB + 1);
         if(pressed) { state.paused = false; ChangeScreen(GameState::Screen::GAME); }
 
         GuiButtonCentered(uiCenterX, y, S(250), S(40), Loc::Pause_Restart(), mPos, pressed);

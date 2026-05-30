@@ -210,9 +210,9 @@ private:
         Vector2 out { (win.x - viewportRect.x)/scale, (win.y - viewportRect.y)/scale };
         return out;
     }
-    Rectangle GuiButtonCentered(float centerX, int &y, int w, int h, const char* label, Vector2 mouse, bool &pressedOut, Ui::Style style = Ui::STYLE_BLUE) const {
+    Rectangle GuiButtonCentered(float centerX, int &y, int w, int h, const char* label, Vector2 mouse, bool &pressedOut, Ui::Style style = Ui::STYLE_BLUE, int k = 0) const {
         Rectangle rc{std::floor(centerX - w/2.f), (float)y, (float)w, (float)h};
-        pressedOut = Ui::Button(rc, label, mouse, IsMouseButtonPressed(MOUSE_LEFT_BUTTON), style);
+        pressedOut = Ui::Button(rc, label, mouse, IsMouseButtonPressed(MOUSE_LEFT_BUTTON), style, k);
         y += h + Ui::Unit() * 4; return rc;
     }
     // Draws gameRT letterboxed into the window (blurred backdrop + crisp pixel blit); no Begin/EndDrawing.

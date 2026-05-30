@@ -378,7 +378,7 @@ bool Button(Rectangle r, const char *label, Vector2 mouse, bool click, Style sty
     if (!held) Frame(lip, p, c.dark, c.dark, c.dark, {6, 6, 14, 255});
     else body.y += p;
     Frame(body, p, c.base, c.light, c.dark, {6, 6, 14, 255});
-    if (k <= 0) k = TextKFor(p / 2.f) + (r.height >= 25 * p ? 1 : 0);
+    if (k <= 0) k = TextKFor(p / 2.f);
     k = FitK(label, k, (int)r.width - 6 * p);
     int tw = Measure(label, k);
     float ty = std::floor(body.y + (body.height - GLYPH_H * k) / 2.f);
