@@ -18,6 +18,10 @@ static int P = 2;       // pixel unit for frames/icons
 static int kB = 2;      // body text scale
 static int kS = 1;      // small text scale
 
+#ifndef SHAPEY_VERSION
+#define SHAPEY_VERSION "dev"
+#endif
+
 static int S(int base) { return (int)(base * uiScale); }
 
 static const Color kGold{255, 214, 110, 255};
@@ -472,7 +476,7 @@ void Game::DrawMenu(){
 
     // Footer: tab hint, version, language picker
     Ui::Text(Loc::Settings_TabHint(), (float)S(10), (float)(sh - S(30)), kS, Color{120, 126, 156, 200});
-    Ui::Text("v1.6", (float)S(10), (float)(sh - S(30) + Ui::GlyphHeight(kS) + 2 * P), kS, Color{80, 86, 110, 200});
+    Ui::Text("v" SHAPEY_VERSION, (float)S(10), (float)(sh - S(30) + Ui::GlyphHeight(kS) + 2 * P), kS, Color{80, 86, 110, 200});
     DrawLanguageBox(mPos, click, sw, sh, uiScale);
 
     if(IsKeyPressed(KEY_TAB)) {

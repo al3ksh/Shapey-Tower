@@ -2,29 +2,6 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "type": "cppbuild",
-            "label": "C/C++: g++ kompiluj aktywny plik",
-            "command": "/usr/bin/g++",
-            "args": [
-                "-fdiagnostics-color=always",
-                "-g",
-                "${file}",
-                "-o",
-                "${fileDirname}/${fileBasenameNoExtension}"
-            ],
-            "options": {
-                "cwd": "${fileDirname}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": false
-            },
-            "detail": "Zadanie wygenerowane przez debuger."
-        },
-        {
             "label": "cmake: configure (Release)",
             "type": "shell",
             "command": "cmake",
@@ -35,8 +12,13 @@
                 "build",
                 "-DCMAKE_BUILD_TYPE=Release"
             ],
-            "options": { "cwd": "${workspaceFolder}" },
-            "group": { "kind": "build", "isDefault": true },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
             "problemMatcher": []
         },
         {
@@ -49,7 +31,9 @@
                 "--config",
                 "Release"
             ],
-            "options": { "cwd": "${workspaceFolder}" },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
             "group": "build",
             "problemMatcher": []
         },
@@ -73,7 +57,9 @@
                 "build-debug",
                 "-DCMAKE_BUILD_TYPE=Debug"
             ],
-            "options": { "cwd": "${workspaceFolder}" },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
             "group": "build",
             "problemMatcher": []
         },
@@ -87,7 +73,9 @@
                 "--config",
                 "Debug"
             ],
-            "options": { "cwd": "${workspaceFolder}" },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
             "group": "build",
             "problemMatcher": []
         },
@@ -112,7 +100,9 @@
                 "--prefix",
                 "${workspaceFolder}\\dist"
             ],
-            "options": { "cwd": "${workspaceFolder}" },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
             "group": "build",
             "problemMatcher": []
         },
@@ -120,8 +110,13 @@
             "label": "cpack: package (Release)",
             "type": "shell",
             "command": "cpack",
-            "args": ["-C", "Release"],
-            "options": { "cwd": "${workspaceFolder}\\build" },
+            "args": [
+                "-C",
+                "Release"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}\\build"
+            },
             "group": "build",
             "problemMatcher": []
         },
@@ -141,7 +136,9 @@
             "label": "Run shapeytower (dist)",
             "type": "shell",
             "command": "${workspaceFolder}\\dist\\shapeytower.exe",
-            "options": { "cwd": "${workspaceFolder}\\dist" },
+            "options": {
+                "cwd": "${workspaceFolder}\\dist"
+            },
             "problemMatcher": []
         }
     ]

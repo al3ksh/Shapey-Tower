@@ -45,5 +45,8 @@ Thumbs.db
 # Temporary
 .TODO.txt
 todo.txt
-# Python
+
+# Python / art generator previews
 __pycache__/
+tools/preview_*.png
+assets/textures/*_preview.png

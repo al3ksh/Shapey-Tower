@@ -1,21 +1,80 @@
-MIT License
+SHAPEY TOWER - PROPRIETARY LICENSE
+All Rights Reserved
 
-Copyright (c) 2025 Aleks Szotek
+Copyright (c) 2025-2026 Aleks Szotek. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+1. OWNERSHIP
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+   This repository and everything in it - including, without limitation, the
+   source code, headers, build scripts, tools, art generators, pixel art,
+   textures, sprites, fonts, icons, shaders, audio, level and gameplay design,
+   text, documentation, screenshots and any compiled binaries (together, the
+   "Work") - is the exclusive property of the copyright holder and is
+   protected by copyright and other intellectual property laws.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. NO LICENSE GRANTED
+
+   No license, right or permission of any kind is granted to you, whether
+   expressly, by implication, by estoppel or otherwise. The Work is NOT open
+   source. Access to the Work (for example, because the repository is
+   publicly visible) does not give you any right to use it.
+
+3. PROHIBITED WITHOUT PRIOR WRITTEN PERMISSION
+
+   Unless you have obtained prior, explicit, written permission signed by the
+   copyright holder, you may not, in whole or in part:
+
+   a) copy, reproduce, download for redistribution, mirror or archive the Work;
+   b) modify, translate, adapt, port or create derivative works of the Work;
+   c) distribute, publish, sublicense, sell, rent, lease, lend or otherwise
+      make the Work or any derivative available to any third party;
+   d) compile, run, publicly perform or publicly display the Work, including
+      streaming or recording it for publication;
+   e) extract, reuse or redistribute any asset of the Work (art, sprites,
+      tiles, fonts, icons, audio, shaders) separately from the Work;
+   f) reverse engineer, decompile or disassemble any binary form of the Work,
+      except to the extent that such restriction is prohibited by applicable
+      law;
+   g) use the Work, or any part of it, to train, fine-tune, evaluate or
+      otherwise develop any machine learning or artificial intelligence
+      model or system, or include it in any dataset;
+   h) use the name "Shapey Tower", its logo or its characters in connection
+      with any product or service;
+   i) remove or alter any copyright notice or this license.
+
+4. THIRD-PARTY COMPONENTS
+
+   The Work links against third-party software that remains the property of
+   its respective owners and is governed solely by its own license, notably
+   raylib (https://www.raylib.com, zlib/libpng license). Nothing in this
+   license restricts rights that those licenses grant for those components.
+
+5. CONTRIBUTIONS
+
+   Any feedback, suggestion or contribution you submit may be used by the
+   copyright holder without restriction and without any obligation to you.
+   Submitting a contribution does not give you any right in the Work.
+
+6. TERMINATION AND ENFORCEMENT
+
+   Any use of the Work in breach of this license is unauthorized and may
+   violate copyright law. The copyright holder reserves all remedies
+   available under applicable law. If you hold any copy of the Work obtained
+   in breach of this license, you must destroy it immediately.
+
+7. NO WARRANTY; LIMITATION OF LIABILITY
+
+   THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL
+   THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
+   OR IN CONNECTION WITH THE WORK OR ANY USE OF IT.
+
+8. GOVERNING LAW
+
+   This license is governed by the laws of the Republic of Poland. Any
+   dispute shall be resolved by the competent courts of Poland.
+
+For permission requests, contact the copyright holder through the GitHub
+profile that hosts this repository.
